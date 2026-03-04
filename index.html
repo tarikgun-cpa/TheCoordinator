@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Coordinator V46 - System Restored</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
+    <script type="text/javascript">
+        try { google.charts.load('current', { 'packages': ['geochart', 'corechart'] }); } 
+        catch(e) { console.warn("Google Charts yüklenemedi."); }
+    </script>
+
+    <style>
+        :root {
+            --primary: #4f46e5; --primary-dark: #4338ca; --primary-light: #eef2ff;
+            --bg-body: #f8fafc; --bg-card: #ffffff; --border-color: #cbd5e1;
+            --text-main: #334155; --text-light: #64748b;
+            --success: #10b981; --danger: #ef4444; --warning: #f59e0b;
+            --shadow-card: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            --shadow-hover: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+        }
+        
+        /* GİRİŞ EKRANI CSS */
+        #loginScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0f172a; z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+        .login-box { background: white; padding: 40px; border-radius: 12px; width: 320px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .login-box input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size:14px; }
+        .login-box button { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size:14px; }
+        #appContent { display: none; } /* Giriş yapılana kadar ana uygulamayı gizler */
+
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-body); padding: 20px; font-size: 12px; color: var(--text-main); margin: 0; }
+        
+        /* HEADER */
+        .header { background: white; padding: 15px 25px; border-radius: 12px; box-shadow: var(--shadow-card); display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-left: 6px solid var(--primary); position: sticky; top: 10px; z-index: 1000; flex-wrap: wrap; gap: 10px; }
+        .company-branding { display: flex; align-items: center; gap: 15px; }
+        .company-logo { height: 40px; max-width: 150px; object-fit: contain; display: none; }
+        .company-name { font-size: 20px; font-weight: 800; color: #1e293b; letter-spacing: -0.5px; }
+        .app-badge { background: var(--primary-light); color: var(--primary); padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; margin-left: 8px; vertical-align: middle; }
+
+        .filter-bar { display: flex; align-items: center; gap: 6px; background: #f1f5f9; padding: 6px; border-radius: 8px; border: 1px solid #e2e8f0; }
+        .filter-bar input, .filter-bar select { border: 1px solid #cbd5e1; padding: 6px 10px; border-radius: 6px; font-size: 11px; outline:none; }
+        .btn-clear { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 11px; }
+        
+        .header-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;}
+        .btn-action { padding: 8px 14px; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 11px; color: white; transition: 0.2s; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .btn-action:active { transform: scale(0.96); }
+        
+        .btn-save { background: var(--success); } .btn-save:hover { background: #059669; }
+        .btn-excel { background: #15803d; } .btn-excel:hover { background: #166534; }
+        .btn-report { background: #0f172a; } .btn-report:hover { background: #334155; }
+        .btn-settings { background: #e2e8f0; color: #475569; } .btn-settings:hover { background: #cbd5e1; }
+        .btn-backup { background: #7c3aed; } .btn-backup:hover { background: #6d28d9; }
+        .btn-restore { background: #db2777; } .btn-restore:hover { background: #be185d; }
+
+        .btn-add-main { background: var(--primary); color: white; border: none; padding: 14px; border-radius: 8px; font-weight: 700; cursor: pointer; width: 100%; margin-bottom: 15px; font-size: 13px; box-shadow: var(--shadow-card); transition: all 0.2s; }
+        .btn-add-main:hover { background: var(--primary-dark); }
+        /* GİRİŞ EKRANI CSS */
+        #loginScreen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #0f172a; z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+        .login-box { background: white; padding: 40px; border-radius: 12px; width: 320px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .login-box input { width: 100%; padding: 12px; margin-bottom: 15px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size:14px; }
+        .login-box button { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size:14px; }
+        #appContent { display: none; } /* Giriş yapılana kadar ana uygulamayı gizler */
+
+        /* TABS */
+        .tabs-container { display: flex; gap: 10px; margin-bottom: 15px; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
+        .tab-btn { background: transparent; border: none; color: #64748b; font-size: 14px; font-weight: 700; padding: 8px 16px; cursor: pointer; border-radius: 8px; transition: all 0.2s; }
+        .tab-btn:hover { background: #f1f5f9; color: #1e293b; }
+        .tab-btn.active { background: var(--primary); color: white; box-shadow: 0 4px 6px rgba(79, 70, 229, 0.2); }
+
+        .container { max-width: 100%; margin: 0 auto; overflow-x: auto; }
+        
+        .list-container-inner { min-width: 1250px; }
+        .list-header { display: grid; grid-template-columns: 1.5fr 1.3fr 1.5fr 0.6fr 0.8fr 0.7fr 0.7fr 0.6fr 0.6fr 0.7fr 0.7fr 1.1fr 0.6fr; gap: 10px; padding: 10px 15px; background: #e2e8f0; border-radius: 8px; font-weight: 700; color: #475569; text-transform: uppercase; font-size: 10px; margin-bottom: 10px; }
+        
+        .shipment-wrapper { margin-bottom: 8px; transition: all 0.3s ease;}
+        .shipment-row { display: grid; grid-template-columns: 1.5fr 1.3fr 1.5fr 0.6fr 0.8fr 0.7fr 0.7fr 0.6fr 0.6fr 0.7fr 0.7fr 1.1fr 0.6fr; gap: 10px; background: white; padding: 12px 15px; border-radius: 8px; cursor: pointer; border: 1px solid #cbd5e1; align-items: center; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .shipment-row:hover { background: #f8fafc; border-color: var(--primary); }
+        .shipment-row.active { border-color: var(--primary); border-bottom-left-radius: 0; border-bottom-right-radius: 0; background: var(--primary-light); }
+        
+        .shipment-row.row-delivered { background-color: #ecfdf5; border-left: 5px solid var(--success); }
+        .shipment-row.row-delivered:hover { background-color: #d1fae5; }
+
+        .row-cell { font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #334155; }
+        .row-cell.hl-green { color: var(--success); font-weight: 800; }
+        .row-cell.hl-star { color: var(--warning); font-size: 13px; font-weight: 800;}
+        .text-right { text-align: right; }
+
+        .shipment-details { display: none; background: white; padding: 20px; border: 1px solid var(--primary); border-top: none; border-radius: 0 0 8px 8px; box-shadow: var(--shadow-card); }
+        .shipment-wrapper.open .shipment-details { display: grid; grid-template-columns: 3fr 3fr 3.5fr 80px; gap: 20px; }
+
+        .col-section { display: flex; flex-direction: column; gap: 10px; border-right: 1px dashed #e2e8f0; padding-right: 15px; }
+        .col-section:last-of-type { border-right: none; padding-right: 0; }
+        .section-title { font-size: 11px; font-weight: 800; text-transform: uppercase; color: #94a3b8; border-bottom: 2px solid #f1f5f9; padding-bottom: 4px; }
+        
+        input, select, textarea { width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 11px; background: #f8fafc; box-sizing: border-box; font-weight: 500; outline: none; }
+        input:focus, select:focus { border-color: var(--primary); background: #fff; }
+        
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+        .inp-wrapper { position: relative; }
+        .inp-wrapper input { padding-right: 40px; text-align: right; font-weight:bold; }
+        .inp-wrapper.large-pad input { padding-right: 110px; }
+        .inp-wrapper .suffix { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 9px; color: #94a3b8; font-weight: 700; pointer-events: none; }
+        .money-wrapper { display: flex; gap: 5px; } .money-select { width: 35%; text-align: center; font-weight: 600; background: var(--primary-light); color: var(--primary); }
+
+        .btn-side { width: 100%; height: 40px; border: none; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; margin-bottom: 5px; transition: 0.2s;}
+        .btn-del { background: #fee2e2; color: var(--danger); } .btn-del:hover { background: var(--danger); color: white; }
+        .btn-clone { background: #dbeafe; color: #2563eb; } .btn-clone:hover { background: #2563eb; color: white; }
+
+        .road-options { display: flex; gap: 4px; } .sub-opt { flex: 1; text-align: center; font-size: 10px; padding: 6px; border: 1px solid #cbd5e1; border-radius: 6px; cursor: pointer; background: #fff; }
+        .sub-opt.selected { background: var(--primary-light); border-color: var(--primary); color: var(--primary); font-weight: bold; }
+
+        /* TAGS */
+        .tags-wrapper, .perf-tags-container { display: flex; flex-wrap: wrap; gap: 4px; }
+        .tag, .perf-tag { padding: 5px 10px; border-radius: 12px; font-size: 9px; font-weight: 600; cursor: pointer; background: #f1f5f9; border: 1px solid transparent; }
+        .tag.selected[data-type="green"] { background: var(--success); color: white; }
+        .tag.selected[data-type="orange"] { background: var(--warning); color: white; }
+        .tag.selected[data-type="red"] { background: var(--danger); color: white; }
+        
+        .perf-tag.selected[data-val^="-"] { background: var(--danger); color: white; }
+        .perf-tag.selected:not([data-val^="-"]):not([data-val="0.0"]) { background: var(--success); color: white; }
+        .perf-tag.selected[data-val="0.0"] { background: var(--warning); color: white; }
+        
+        .score-area { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px; margin-top: 5px; font-size: 10px; display:flex; justify-content: space-between; align-items:center; }
+        .star-rating { font-size: 14px; color: #cbd5e1; } .star-rating .filled { color: var(--warning); text-shadow: 0 1px 2px rgba(245, 158, 11, 0.3); }
+
+        .photo-btn { display:block; text-align:center; padding:8px; border:1px dashed #94a3b8; border-radius:6px; cursor:pointer; font-size:10px; font-weight:bold; color:#475569; background:#f1f5f9; transition:0.2s;}
+        .photo-btn:hover { background:#e2e8f0; border-color:var(--primary); }
+        .photo-item { position:relative; width:45px; height:45px; }
+        .photo-thumb { width:100%; height:100%; object-fit:cover; border-radius:6px; cursor:zoom-in; border:1px solid #ccc; }
+        .btn-rm-img { position:absolute; top:-5px; right:-5px; width:16px; height:16px; background:var(--danger); color:white; border-radius:50%; font-size:10px; display:flex; align-items:center; justify-content:center; cursor:pointer;}
+
+        .modal-overlay { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(3px); overflow-y:auto; opacity: 0; transition: opacity 0.3s;}
+        .modal-overlay.show { opacity: 1; }
+        .settings-content { margin: 100px auto; max-width: 400px; background: white; border-radius: 12px; padding: 30px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.3); transform: scale(0.9); transition: 0.3s; }
+        .modal-overlay.show .settings-content { transform: scale(1); }
+        .settings-row { margin-bottom: 15px; } .settings-label { display: block; margin-bottom: 5px; font-weight: 600; }
+        
+        #toast-container { position: fixed; top: 20px; right: 20px; z-index: 3000; display: flex; flex-direction: column; gap: 10px; }
+        .toast { background: white; padding: 15px 20px; border-radius: 8px; box-shadow: var(--shadow-hover); border-left: 4px solid var(--success); font-weight: bold; animation: slideIn 0.3s ease-out; }
+        .toast.error { border-color: var(--danger); }
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+        /* Report Styles */
+        .report-content { margin: 40px auto; width: 95%; max-width: 1200px; background: white; border-radius: 12px; padding: 30px; position: relative; }
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .kpi-card { background: #f8fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; }
+        .kpi-label { font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase; margin-bottom: 5px; }
+        .kpi-value { font-size: 20px; font-weight: 800; color: #1e293b; }
+        .analysis-section { margin-bottom: 30px; }
+        .analysis-title { font-size: 14px; font-weight: 700; border-left: 4px solid var(--primary); padding-left: 8px; margin-bottom: 10px; }
+        .data-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        .data-table th { background: #f1f5f9; padding: 8px; text-align: left; }
+        .data-table td { padding: 8px; border-bottom: 1px solid #e2e8f0; }
+        .finance-group { flex: 1; min-width: 250px; background: #f8fafc; border-radius: 8px; padding: 15px; border: 1px solid #e2e8f0; }
+        .finance-title { font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 10px; border-bottom: 1px dashed #cbd5e1; padding-bottom: 6px; }
+        .finance-row { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 12px; font-weight: 600; }
+        .rich-table-row { display: grid; grid-template-columns: 1.5fr 2fr 1fr 1fr 2fr; align-items: center; padding: 8px; border-bottom: 1px solid #e2e8f0; gap: 10px; }
+        .rich-table-header { background: #f1f5f9; font-weight: 700; color: #475569; border-radius: 6px; font-size: 10px; border: none; }
+        .bar-container { display: flex; align-items: center; gap: 8px; height: 100%; }
+        .mini-bar-track { flex: 1; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
+        .mini-bar-fill { height: 100%; background: var(--primary); border-radius: 3px; }
+        .img-modal-content { max-width: 90%; max-height: 90%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); border-radius: 12px; }
+        .img-close { position: absolute; top: 20px; right: 40px; color: #fff; font-size: 45px; font-weight: bold; cursor: pointer; }
+        .visual-chart-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:11px; }
+        .v-label { width:80px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .v-bar-area { flex:1; height:20px; background:#f1f5f9; border-radius:4px; overflow:hidden; position:relative; }
+        .v-bar-fill { height:100%; background:var(--primary); color:white; font-size:10px; display:flex; align-items:center; padding-left:5px; font-weight:bold; white-space:nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
+        .v-value { width:65px; text-align:right; font-weight:700; color:#64748b; }
+        @media print { body * { display:none!important; } #reportModal, #reportModal * { display:block!important; visibility:visible!important; position:static!important; } .report-content{margin:0; width:100%; box-shadow:none;} .btn-action{display:none!important;} }
+    </style>
+</head>
+<body>
+    <div id="loginScreen">
+        <div class="login-box">
+            <h2 style="margin-top:0; color:#1e293b;">The Coordinator</h2>
+            <p style="color:#64748b; font-size:12px; margin-bottom:20px;">Lütfen giriş yapın</p>
+            <input type="email" id="logEmail" placeholder="E-Posta">
+            <input type="password" id="logPass" placeholder="Şifre">
+            <button onclick="loginWithFirebase()">GİRİŞ YAP</button>
+        </div>
+    </div>
+
+    <div id="appContent">
+        <div id="toast-container"></div>
+        <input type="file" id="restoreInput" style="display:none" onchange="restoreBackup(this)" accept=".json">
+
+    <div class="header">
+        <div class="company-branding">
+            <img id="headerLogo" class="company-logo" src="" alt="Logo">
+            <div>
+                <div class="company-name" id="headerCompanyName">THE COORDINATOR</div>
+                <span class="app-badge">V46 - SYSTEM RESTORED</span>
+            </div>
+        </div>
+        <div class="header-actions">
+            <div class="filter-bar">
+                <input type="text" id="globalSearch" placeholder="🔍 Ara..." oninput="filterCards()">
+                <select id="filterMode" onchange="filterCards()">
+                    <option value="">Mod</option><option value="Tır">Tır</option><option value="Gemi">Gemi</option><option value="Uçak">Uçak</option><option value="Minivan">Minivan</option>
+                </select>
+                <input type="date" id="filterStartDate" onchange="filterCards()">
+                <input type="date" id="filterEndDate" onchange="filterCards()">
+                <button class="btn-clear" onclick="clearFilters()">Temizle</button>
+            </div>
+            
+            <button class="btn-action btn-backup" onclick="downloadBackup()">☁️ Yedek İndir</button>
+            <button class="btn-action btn-restore" onclick="triggerRestore()">📥 Yedek Yükle</button>
+            <button class="btn-action" style="background: #0284c7; color: white;" onclick="openCompanies()">🏢 Firmalar</button>
+            <button class="btn-action btn-settings" onclick="openSettings()">⚙️ Ayarlar</button>
+            <button class="btn-action btn-excel" onclick="exportToExcel()">📗 Excel</button>
+            <button class="btn-action btn-report" onclick="openReportDashboard()">📊 Rapor</button>
+            <button class="btn-action btn-save" onclick="saveData()">💾 Kaydet</button>
+            <button class="btn-action btn-del" onclick="logout()">🚪 Çıkış</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <button class="btn-add-main" onclick="addCard()">+ YENİ SEVKİYAT EKLE</button>
+
+        <div class="tabs-container">
+            <button class="tab-btn active" data-tab="active" onclick="switchTab('active')">🚚 Yolda Olanlar</button>
+            <button class="tab-btn" data-tab="delivered" onclick="switchTab('delivered')">✅ Teslim Edilenler</button>
+            <button class="tab-btn" data-tab="all" onclick="switchTab('all')">📋 Tüm Sevkiyatlar</button>
+        </div>
+
+        <div class="list-container-inner">
+            <div class="list-header">
+                <div>Müşteri</div> <div>Fatura No</div> <div>Nakliyeci</div> <div>Mod</div> <div>Sevk. Trh.</div> <div>EDT</div> <div>ETA</div> <div class="text-right">Adet</div> <div class="text-right">Palet</div> <div class="text-right">Net KG</div> <div class="text-right">Brüt KG</div> <div class="text-right">Navlun</div> <div class="text-right">Puan</div>
+            </div>
+            <div id="cardContainer"></div>
+        </div>
+    </div> 
+
+    <div id="settingsModal" class="modal-overlay">
+        <div class="settings-content">
+            <h3 style="margin-bottom:20px; color:#1e293b;">🏢 Firma Ayarları</h3>
+            <div class="settings-row">
+                <label class="settings-label">Firma Adı</label>
+                <input type="text" id="setCompanyName" placeholder="Örn: ACME Lojistik A.Ş.">
+            </div>
+            <div class="settings-row">
+                <label class="settings-label">Logo URL</label>
+                <input type="text" id="setLogoUrl" placeholder="https://site.com/logo.png">
+            </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px;">
+                <button class="btn-action btn-del" onclick="closeModal('settingsModal')" style="width:auto;">İptal</button>
+                <button class="btn-action btn-save" onclick="saveSettings()">Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="imgModal" class="modal-overlay" onclick="this.style.display='none'">
+        <span class="img-close">&times;</span>
+        <img class="img-modal-content" id="imgFull">
+    </div>
+
+    <div id="reportModal" class="modal-overlay">
+        <div class="report-content">
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #e2e8f0; padding-bottom:15px; margin-bottom:20px;">
+                <div style="display:flex; align-items:center; gap:20px;">
+                    <img id="reportLogo" class="report-logo" src="" alt="">
+                    <div>
+                        <div class="report-company-name" id="reportCompanyName" style="color:var(--primary); font-weight:bold;">FİRMA ADI</div>
+                        <h2 style="margin:0; font-size:24px; font-weight:800;">📊 Yönetim Lojistik Raporu</h2>
+                        <span style="font-size:12px; color:#64748b;" id="reportDate"></span>
+                    </div>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn-action btn-save" onclick="window.print()">🖨️ Yazdır/PDF</button>
+                    <button class="btn-action btn-del" onclick="closeModal('reportModal')">Kapat</button>
+                </div>
+            </div>
+            <div class="kpi-grid" id="kpiArea"></div>
+            <div class="analysis-section"><div class="analysis-title">💰 Finansal Genel Bakış</div><div id="financeArea" style="display:flex; gap:20px; flex-wrap:wrap;"></div></div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+                <div class="analysis-section"><div class="analysis-title">🚚 Taşıma Modu Analizi</div><div class="rich-table-header rich-table-row"><span>Taşıma Tipi</span> <span class="text-right">Sefer</span> <span class="text-right">Toplam KG</span> <span class="text-right">Parça</span> <span class="text-right">Toplam Navlun</span></div><div id="modeTable"></div></div>
+                <div class="analysis-section"><div class="analysis-title">📦 Teslim Şekli (Incoterm)</div><div class="rich-table-header rich-table-row"><span>Incoterm</span> <span class="text-right">Sefer</span> <span class="text-right">Toplam KG</span> <span class="text-right">Parça</span> <span class="text-right">Toplam Navlun</span></div><div id="incotermTable"></div></div>
+            </div>
+            <div class="analysis-section"><div class="analysis-title">📅 Aylık Sevkiyat ve Ciro Trendi</div><div class="rich-table-header rich-table-row"><span>Ay / Yıl</span> <span class="text-right">Yoğunluk</span> <span class="text-right">Toplam KG</span> <span class="text-right">Parça</span> <span class="text-right">Satış Tutarı</span></div><div id="monthTable"></div></div>
+            <div class="analysis-section"><div class="analysis-title">🌍 Küresel İhracat Haritası</div><div id="regions_div" style="height:400px; background:#f8fafc; border-radius:8px;"></div></div>
+            <div class="analysis-section"><div class="analysis-title">🗺️ Ülke Bazlı Ciro Analizi (En Çok İhracat)</div><div style="display:grid; grid-template-columns: 1fr 1fr; gap:30px;"><div id="countryVisualChart"></div><table class="data-table"><thead><tr><th>Ülke</th><th class="text-right">Yük (Sefer)</th><th class="text-right">Toplam KG</th><th class="text-right">Parça</th><th class="text-right">Toplam İhracat Tutarı</th></tr></thead><tbody id="countryTableBody"></tbody></table></div></div>
+            <div class="analysis-section"><div class="analysis-title">🏆 Nakliyeci Performans & Maliyet Analizi</div><table class="data-table"><thead><tr><th>Firma</th><th class="text-right">İş Sayısı</th><th class="text-right">Toplam Yük</th><th class="text-right">Toplam Ödeme</th><th class="text-right">Ort. Süre</th><th class="text-right">Ort. Puan</th></tr></thead><tbody id="forwarderTableBody"></tbody></table></div>
+            <div class="analysis-section"><div class="analysis-title">🤝 Müşteri Ciro Analizi (Top Müşteriler)</div><table class="data-table"><thead><tr><th>Müşteri</th><th>Ülke</th><th class="text-right">Sevkiyat</th><th class="text-right">Parça</th><th class="text-right">Toplam KG</th><th class="text-right">Toplam Satış (Mal Bedeli)</th></tr></thead><tbody id="clientTableBody"></tbody></table></div>
+        </div>
+    </div>
+<div id="companiesModal" class="modal-overlay">
+        <div class="settings-content" style="max-width: 650px;">
+            <h3 style="margin-bottom:20px; color:#1e293b;">🏢 Kayıtlı Firmalar</h3>
+            <div style="display:grid; grid-template-columns: 2fr 1.5fr 1.5fr auto; gap:10px; margin-bottom:15px;">
+                <input type="text" id="newCompanyName" placeholder="Firma Adı..." oninput="this.value=this.value.toUpperCase()">
+                <input list="allCountriesList" id="newCompanyCountry" placeholder="Ülke" oninput="this.value=this.value.toUpperCase()">
+                <input type="text" id="newCompanyCity" placeholder="Şehir" oninput="this.value=this.value.toUpperCase()">
+                <button class="btn-action btn-save" onclick="addCompany()">Ekle</button>
+            </div>
+            <div id="companyManagerList" style="max-height:300px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:6px; padding:10px; background:#f8fafc;">
+                </div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+                <button class="btn-action btn-del" onclick="closeModal('companiesModal')">Kapat</button>
+            </div>
+        </div>
+    </div>
+    <datalist id="companyList"><option value="HENSTAR LIMITED"><option value="ALUMINIUM DYNAMICS LLC"><option value="FLOTTWEG SE"></datalist>
+    <datalist id="forwarderList"><option value="MTS LOJISTIK"><option value="TCT LOJİSTİK"><option value="ELS NAKLİYAT"></datalist>
+    <datalist id="allCountriesList">
+        <option value="AF - AFGANİSTAN"><option value="DE - ALMANYA"><option value="US - AMERİKA BİRLEŞİK DEVLETLERİ">
+        <option value="AD - ANDORRA"><option value="AO - ANGOLA"><option value="AR - ARJANTİN">
+        <option value="AL - ARNAVUTLUK"><option value="AU - AVUSTRALYA"><option value="AT - AVUSTURYA">
+        <option value="AZ - AZERBAYCAN"><option value="BH - BAHREYN"><option value="BD - BANGLADEŞ">
+        <option value="BE - BELÇİKA"><option value="AE - BİRLEŞİK ARAP EMİRLİKLERİ"><option value="GB - BİRLEŞİK KRALLIK">
+        <option value="BA - BOSNA HERSEK"><option value="BR - BREZİLYA"><option value="BG - BULGARİSTAN">
+        <option value="DZ - CEZAYİR"><option value="CZ - ÇEKYA"><option value="CN - ÇİN">
+        <option value="DK - DANİMARKA"><option value="ID - ENDONEZYA"><option value="EE - ESTONYA">
+        <option value="MA - FAS"><option value="FI - FİNLANDİYA"><option value="FR - FRANSA">
+        <option value="ZA - GÜNEY AFRİKA"><option value="KR - GÜNEY KORE"><option value="GE - GÜRCİSTAN">
+        <option value="HR - HIRVATİSTAN"><option value="IN - HİNDİSTAN"><option value="NL - HOLLANDA">
+        <option value="IQ - IRAK"><option value="IR - İRAN"><option value="IE - İRLANDA">
+        <option value="ES - İSPANYA"><option value="IL - İSRAİL"><option value="SE - İSVEÇ">
+        <option value="CH - İSVİÇRE"><option value="IT - İTALYA"><option value="IS - İZLANDA">
+        <option value="JP - JAPONYA"><option value="CA - KANADA"><option value="QA - KATAR">
+        <option value="KZ - KAZAKİSTAN"><option value="KG - KIRGIZİSTAN"><option value="XK - KOSOVA">
+        <option value="KW - KUVEYT"><option value="LY - LİBYA"><option value="LT - LİTVANYA">
+        <option value="LB - LÜBNAN"><option value="LU - LÜKSEMBURG"><option value="HU - MACARİSTAN">
+        <option value="MK - MAKEDONYA"><option value="MY - MALEZYA"><option value="MX - MEKSİKA">
+        <option value="EG - MISIR"><option value="MD - MOLDOVA"><option value="NO - NORVEÇ">
+        <option value="UZ - ÖZBEKİSTAN"><option value="PK - PAKİSTAN"><option value="PL - POLONYA">
+        <option value="PT - PORTEKİZ"><option value="RO - ROMANYA"><option value="RU - RUSYA">
+        <option value="RS - SIRBİSTAN"><option value="SG - SİNGAPUR"><option value="SK - SLOVAKYA">
+        <option value="SI - SLOVENYA"><option value="SA - SUUDİ ARABİSTAN"><option value="TW - TAYVAN">
+        <option value="TN - TUNUS"><option value="TR - TÜRKİYE"><option value="TM - TÜRKMENİSTAN">
+        <option value="UA - UKRAYNA"><option value="OM - UMMAN"><option value="JO - ÜRDÜN">
+        <option value="VN - VİETNAM"><option value="GR - YUNANİSTAN">
+    </datalist>
+
+    <template id="cardTemplate">
+        <div class="shipment-wrapper" data-tab-status="active" oninput="updateRowSummary(this)" onchange="updateRowSummary(this)">
+            <div class="shipment-row" onclick="toggleDetails(this)">
+                <div class="row-cell sum-company">Yeni Firma</div>
+                <div class="row-cell sum-invoice">-</div>
+                <div class="row-cell sum-forwarder">-</div>
+                <div class="row-cell sum-mode">-</div>
+                <div class="row-cell sum-load">-</div>
+                <div class="row-cell sum-edt">-</div>
+                <div class="row-cell sum-eta">-</div>
+                <div class="row-cell sum-pcs text-right">-</div>
+                <div class="row-cell sum-pallet text-right">-</div>
+                <div class="row-cell sum-net text-right">-</div>
+                <div class="row-cell sum-gross text-right">-</div>
+                <div class="row-cell sum-freight hl-green text-right">0 EUR</div>
+                <div class="row-cell sum-score hl-star text-right">0.0 ★</div>
+            </div>
+
+            <div class="shipment-details">
+                <div class="col-section">
+                    <div class="section-title">🏢 Müşteri & Detay</div>
+                    <input list="companyList" class="inp-company" placeholder="Firma Adı..." onchange="autoFillCompanyDetails(this)" oninput="this.value=this.value.toUpperCase();">
+                    <div class="grid-2">
+                        <input list="allCountriesList" class="country-select" placeholder="Ülke Ara/Seç..." onchange="calculateAutoScore(this)" oninput="this.value = this.value.toUpperCase()">
+                        <input type="text" class="inp-city" placeholder="Şehir">
+                    </div>
+                    <textarea class="inp-mail" placeholder="Alıcı Mailleri..."></textarea>
+                    <div class="grid-2">
+                        <input type="text" class="inp-invoice" placeholder="Fatura No">
+                        <input type="date" class="date-invoice" title="Fatura Tarihi">
+                    </div>
+                    <select class="inp-incoterm" onchange="handleIncoterm(this); calculateAutoScore(this)">
+                        <option value="FCA">FCA</option><option value="DAP">DAP</option><option value="DDP">DDP</option><option value="EXW">EXW</option><option value="CIP">CIP</option>
+                    </select>
+
+                    <div class="photo-area" style="margin-top:10px;">
+                        <label class="photo-btn">📷 Fotoğraf Ekle (Max 2)</label>
+                        <input type="file" accept="image/*" multiple style="display:none" onchange="handleImageUpload(this)">
+                        <div class="photo-preview-container" style="display:flex; gap:10px; margin-top:5px;"></div>
+                    </div>
+                </div>
+
+                <div class="col-section">
+                    <div class="section-title">🚚 Lojistik & Kargo</div>
+                    <input list="forwarderList" class="inp-forwarder" placeholder="Nakliyeci..." oninput="this.value = this.value.toUpperCase()">
+                    
+                    <div class="grid-2">
+                        <select class="mode-select" onchange="handleModeChange(this); calculateAutoScore(this)">
+                            <option value="Tır">🚛 Tır</option><option value="Gemi">🚢 Gemi</option><option value="Uçak">✈️ Uçak</option><option value="Minivan">🚐 Minivan</option>
+                        </select>
+                        <input type="text" class="inp-vessel" placeholder="🚢 Gemi Adı..." style="display:none;">
+                        <input type="text" class="inp-plate" placeholder="🚛 Araç / Plaka" style="display:block;">
+                    </div>
+                    
+                    <div class="sea-fields" style="display:none; margin-top:5px;">
+                        <div class="grid-2">
+                            <input type="text" class="inp-booking" placeholder="Booking No">
+                            <input type="text" class="inp-container" placeholder="Konteyner No">
+                        </div>
+                    </div>
+                    
+                    <div class="road-options">
+                        <div class="sub-opt" onclick="selectSubOpt(this, 'Komple')">🚛 Komple</div>
+                        <div class="sub-opt" onclick="selectSubOpt(this, 'Parsiyel')">📦 Parsiyel</div>
+                    </div>
+
+                    <div class="grid-2" style="margin-top:5px;">
+                        <div class="inp-wrapper"><input type="number" class="inp-pcs" placeholder="Adet"><span class="suffix">Ad</span></div>
+                        <div class="inp-wrapper"><input type="number" class="inp-pallet" placeholder="Palet"><span class="suffix">Plt</span></div>
+                    </div>
+                    <div class="grid-2">
+                        <div class="inp-wrapper"><input type="text" class="inp-net" placeholder="Net"><span class="suffix">KG</span></div>
+                        <div class="inp-wrapper"><input type="text" class="inp-gross" placeholder="Brüt"><span class="suffix">KG</span></div>
+                    </div>
+
+                    <div class="grid-3" style="margin-top:5px;">
+                        <div><span style="font-size:9px; color:#64748b;">YÜKLEME</span><input type="date" class="date-load" onchange="calculateDates(this)"></div>
+                        <div><span style="font-size:9px; color:#64748b;">EDT</span><input type="date" class="date-edt" onchange="calculateDates(this)"></div>
+                        <div><span style="font-size:9px; color:#64748b;">ETA</span><input type="date" class="date-eta" onchange="calculateDates(this)"></div>
+                    </div>
+                    <div style="font-size:10px; color:#64748b; margin-top:5px; text-align:right;">Süre: <b class="res-total" style="color:var(--primary)">-</b></div>
+                </div>
+
+                <div class="col-section">
+                    <div class="section-title">💰 Finans & Performans</div>
+                    
+                    <div class="money-wrapper" style="margin-bottom:5px;">
+                        <div class="inp-wrapper large-pad" style="width: 65%;"><input type="text" class="inp-value" placeholder="Tutar" onblur="formatCurrency(this)"><span class="suffix">Mal Bedeli</span></div>
+                        <select class="money-select inp-value-curr"><option>EUR</option><option>USD</option><option>GBP</option></select>
+                    </div>
+
+                    <div class="money-wrapper" style="margin-bottom:5px;">
+                        <div class="inp-wrapper large-pad" style="width: 65%;"><input type="text" class="inp-freight" placeholder="Navlun" onblur="formatCurrency(this)"><span class="suffix">Navlun</span></div>
+                        <select class="money-select inp-freight-curr"><option>EUR</option><option>USD</option><option>GBP</option><option>TRY</option></select>
+                    </div>
+
+                    <div class="tags-wrapper status-tags" style="margin-top:5px;">
+                        <span class="tag" data-type="green" onclick="toggleTag(this)">Evrak Hazır</span>
+                        <span class="tag" data-type="green" onclick="toggleTag(this)">Evrak Mail Atıldı</span>
+                        <span class="tag" data-type="green" onclick="toggleTag(this)">Sevk Edildi</span>
+                        <span class="tag" data-type="green" onclick="toggleTag(this)">Teslim Edildi</span>
+                        <span class="tag" data-type="green" onclick="toggleTag(this)">Ödeme Alındı</span>
+                        <span class="tag" data-type="orange" onclick="toggleTag(this)">CMR Hazır</span>
+                        <span class="tag" data-type="orange" onclick="toggleTag(this)">Sigorta Yapıldı</span>
+                        <span class="tag" data-type="red" onclick="toggleTag(this)">Nakliye Bekliyor</span>
+                        <span class="tag" data-type="red" onclick="toggleTag(this)">İç Nakliye</span>
+                        <span class="tag" data-type="red" onclick="toggleTag(this)">Antrepoda</span>
+                    </div>
+
+                    <div class="insurance-wrapper" style="display:none; margin-top:5px;">
+                        <div class="money-wrapper insurance-active">
+                             <div class="inp-wrapper large-pad" style="width: 65%;">
+                                 <input type="text" class="inp-insurance" placeholder="Sigorta" onblur="formatCurrency(this)"><span class="suffix">Poliçe Bedeli</span>
+                             </div>
+                             <select class="money-select inp-insurance-curr"><option>EUR</option><option>USD</option><option>TRY</option></select>
+                        </div>
+                    </div>
+
+                    <div class="perf-tags-container" style="margin-top:5px;">
+                        <span class="perf-tag" data-val="1.0" onclick="toggleScoreTag(this)">Sorunsuz</span>
+                        <span class="perf-tag" data-val="2.0" onclick="toggleScoreTag(this)">Mükemmel</span>
+                        <span class="perf-tag" data-val="3.0" onclick="toggleScoreTag(this)">Özel Teslimat</span>
+                        <span class="perf-tag" data-val="0.0" onclick="toggleScoreTag(this)">Haşere</span>
+                        <span class="perf-tag" data-val="-0.3" onclick="toggleScoreTag(this)">Pahalı Fiyat</span>
+                        <span class="perf-tag" data-val="-0.5" onclick="toggleScoreTag(this)">Takipsizlik</span>
+                        <span class="perf-tag" data-val="-1.0" onclick="toggleScoreTag(this)">İntaç Eksik</span>
+                        <span class="perf-tag" data-val="-1.3" onclick="toggleScoreTag(this)">Geç Teslim</span>
+                        <span class="perf-tag" data-val="-1.5" onclick="toggleScoreTag(this)">Pas</span>
+                        <span class="perf-tag" data-val="-2.0" onclick="toggleScoreTag(this)">Yükte Hasar</span>
+                        <span class="perf-tag" data-val="-3.0" onclick="toggleScoreTag(this)">Büyük Hasar</span>
+                    </div>
+
+                    <div class="score-area" style="margin-top:10px;">
+                        <div class="star-rating">★★★★★ <span class="autoScoreText" style="font-size:10px; color:#64748b;">--</span></div>
+                        <div style="font-weight:800;">Puan: <span class="manual-score" style="color:var(--primary); font-size:14px;">0.0</span></div>
+                    </div>
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:5px;">
+                    <button class="btn-side btn-save" style="margin-bottom:0;" onclick="saveAndCloseCard(this)" title="Kaydet">💾 Kaydet</button>
+                    <button class="btn-side btn-clone" style="margin-bottom:0;" onclick="cloneCard(this)" title="Kopyala">📄 Kopyala</button>
+                    <button class="btn-side btn-del" style="margin-bottom:0;" onclick="deleteCard(this)" title="Sil">✕ Sil</button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script>
+        // AI HEDEF SÜRE TANIMLAMALARI
+        const transitTargets = { 
+            'DE': {'Tır': 8, 'Minivan': 3, 'Gemi': 25, 'Uçak': 2}, 
+            'US': {'Gemi': 30, 'Uçak': 4}, 
+            'TR': {'Tır': 2, 'Minivan': 1} 
+        };
+        const defaultTargets = {'Tır': 12, 'Gemi': 35, 'Uçak': 4, 'Minivan': 5};
+
+        // --- TOAST NOTIFICATIONS ---
+        function showToast(msg, type='success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div'); toast.className = `toast ${type}`; toast.innerHTML = type === 'success' ? '✅ ' + msg : (type === 'error' ? '⚠️ ' + msg : 'ℹ️ ' + msg);
+            container.appendChild(toast); setTimeout(() => toast.remove(), 3000);
+        }
+
+        // --- SETTINGS MODAL ---
+        function openSettings() {
+            document.getElementById('settingsModal').style.display = 'block';
+            setTimeout(() => document.getElementById('settingsModal').classList.add('show'), 10);
+            let conf = JSON.parse(localStorage.getItem('coord_settings')) || {};
+            if(conf.name) document.getElementById('setCompanyName').value = conf.name;
+            if(conf.logo) document.getElementById('setLogoUrl').value = conf.logo;
+        }
+
+        function closeModal(id) {
+            let el = document.getElementById(id);
+            el.classList.remove('show');
+            setTimeout(() => el.style.display = 'none', 300);
+        }
+
+        function saveSettings() {
+            let name = document.getElementById('setCompanyName').value;
+            let logo = document.getElementById('setLogoUrl').value;
+            localStorage.setItem('coord_settings', JSON.stringify({ name: name, logo: logo }));
+            applySettings();
+            closeModal('settingsModal');
+            showToast('Firma ayarları başarıyla kaydedildi.');
+        }
+
+        function applySettings() {
+            let conf = JSON.parse(localStorage.getItem('coord_settings'));
+            if(conf) {
+                if(conf.name) {
+                    document.getElementById('headerCompanyName').innerText = conf.name;
+                    document.getElementById('reportCompanyName').innerText = conf.name;
+                }
+                if(conf.logo) {
+                    document.getElementById('headerLogo').src = conf.logo;
+                    document.getElementById('headerLogo').style.display = 'block';
+                    document.getElementById('reportLogo').src = conf.logo;
+                    document.getElementById('reportLogo').style.display = 'block';
+                }
+            }
+        }
+
+        // --- BACKUP & RESTORE LOGIC ---
+        function downloadBackup() {
+            let cards = [];
+            document.querySelectorAll('.shipment-wrapper').forEach(w => cards.push(extractCardData(w)));
+            if(cards.length === 0) return showToast("Yedeklenecek veri yok!", "error");
+            
+            let conf = localStorage.getItem('coord_settings');
+            let backupObj = { data: cards, settings: conf ? JSON.parse(conf) : {} };
+            
+            const blob = new Blob([JSON.stringify(backupObj)], {type: "application/json"});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; 
+            a.download = `Yedek_${new Date().toLocaleDateString('tr-TR')}.json`; 
+            a.click(); URL.revokeObjectURL(url);
+            showToast("Yedek başarıyla indirildi.");
+        }
+
+        function triggerRestore() { document.getElementById('restoreInput').click(); }
+        
+        function restoreBackup(input) {
+            const file = input.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    let parsed = JSON.parse(e.target.result);
+                    let importedData = parsed.data || parsed; 
+                    
+                    // Sadece yeni versiyona ait (Firma Adı/Logo) ayarlar varsa ezmeye izin ver
+                    // Eski yedekteki gereksiz verilerin ayarları bozmasını engelliyoruz
+                    if(parsed.settings && (parsed.settings.name || parsed.settings.logo)) {
+                        localStorage.setItem('coord_settings', JSON.stringify(parsed.settings));
+                    }
+                    
+                    localStorage.setItem('coordV46_data', JSON.stringify(importedData));
+                    showToast("Yedek başarıyla yüklendi! Sayfa yenileniyor...");
+                    setTimeout(() => location.reload(), 1500);
+                } catch(err) {
+                    showToast("Geçersiz yedek dosyası formatı!", "error");
+                }
+            };
+            reader.readAsText(file);
+            input.value = "";
+        }
+
+        // --- TABS LOGIC ---
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`.tab-btn[data-tab="${tabName}"]`).classList.add('active');
+            filterCards(); 
+        }
+
+        // --- EXCEL EXPORT (16 COLUMNS) ---
+        function exportToExcel() {
+            const cards = [];
+            document.querySelectorAll('.shipment-wrapper').forEach(w => {
+                if(w.style.display !== 'none') {
+                    let d = extractCardData(w);
+                    let imgs = [];
+                    w.querySelectorAll('.photo-thumb').forEach(img => imgs.push(img.src));
+                    while(imgs.length < 4) imgs.push("");
+                    d.photos = imgs;
+                    cards.push(d);
+                }
+            });
+
+            if(cards.length === 0) return showToast("Dışa aktarılacak veri yok.", "error");
+
+            let ws_data = [
+                ["Fatura No", "Yükleme Tarihi", "Alıcı Firma", "Satış Tutarı", "Parça Adeti", "Net Kilo", "Palet Sayısı", "Nakliyeci", "Navlun Ücreti", "Sigorta Tutarı", "İhracat Türü", "ETA Tarihi", "Ürün Fotosu 1", "Ürün Fotosu 2", "Ürün Fotosu 3", "Ürün Fotosu 4"]
+            ];
+
+            cards.forEach(c => {
+                let salesAmount = c.value + " " + c.valueCurr;
+                let freightAmount = c.freight + " " + c.freightCurr;
+                let insuranceAmount = c.insurance ? (c.insurance + " " + c.insuranceCurr) : "-";
+
+                let p1 = c.photos[0] ? "[Görsel Sistemde]" : "";
+                let p2 = c.photos[1] ? "[Görsel Sistemde]" : "";
+                let p3 = c.photos[2] ? "[Görsel Sistemde]" : "";
+                let p4 = c.photos[3] ? "[Görsel Sistemde]" : "";
+
+                ws_data.push([
+                    c.invoice, c.dateLoad, c.company, salesAmount, c.pcs, c.net, c.pallet,
+                    c.forwarder, freightAmount, insuranceAmount, c.incoterm, c.dateEta,
+                    p1, p2, p3, p4
+                ]);
+            });
+
+            var wb = XLSX.utils.book_new();
+            var ws = XLSX.utils.aoa_to_sheet(ws_data);
+            XLSX.utils.book_append_sheet(wb, ws, "Sevkiyatlar");
+            XLSX.writeFile(wb, `Sevkiyat_Listesi_${new Date().toLocaleDateString('tr-TR')}.xlsx`);
+            showToast('Excel dosyası indiriliyor...');
+        }
+
+        // --- LOCAL STORAGE LOGIC ---
+        
+        function addCard(data = null, isLoad = false) {
+            const tpl = document.getElementById('cardTemplate').content.cloneNode(true);
+            const w = tpl.querySelector('.shipment-wrapper');
+            w.dataset.timestamp = Date.now(); 
+            const photoBtn = w.querySelector('.photo-btn');
+            const fileInp = w.querySelector('input[type="file"]');
+            photoBtn.onclick = () => fileInp.click();
+
+            // Sırlama Mantığı: Yükleniyorsa sona ekle, yeni oluşturuluyorsa başa ekle
+            if (isLoad) {
+                document.getElementById('cardContainer').appendChild(w);
+            } else {
+                document.getElementById('cardContainer').prepend(w);
+            }
+
+            if(data) fillCardData(w, data);
+            updateRowSummary(w);
+            if(!data) { toggleDetails(w.querySelector('.shipment-row')); filterCards(); }
+            return w;
+        }
+
+        function extractCardData(w) {
+            let roadOpt = w.querySelector('.sub-opt.selected');
+            let imgs = []; w.querySelectorAll('.photo-thumb').forEach(i => imgs.push(i.src));
+            let sTags = []; w.querySelectorAll('.status-tags .tag.selected').forEach(t => sTags.push(t.innerText));
+            let pTags = []; w.querySelectorAll('.perf-tags-container .perf-tag.selected').forEach(t => pTags.push(t.innerText));
+            
+            let countryVal = w.querySelector('.country-select').value;
+            let countryCode = countryVal.includes(" - ") ? countryVal.split(" - ")[0] : countryVal;
+            let countryName = countryVal.includes(" - ") ? countryVal.split(" - ")[1] : countryVal;
+
+            return {
+                timestamp: w.dataset.timestamp ? Number(w.dataset.timestamp) : Date.now(),
+                company: w.querySelector('.inp-company').value, country: countryCode, countryName: countryName, city: w.querySelector('.inp-city').value,
+                invoice: w.querySelector('.inp-invoice').value, dateInvoice: w.querySelector('.date-invoice').value, incoterm: w.querySelector('.inp-incoterm').value,
+                forwarder: w.querySelector('.inp-forwarder').value, mode: w.querySelector('.mode-select').value, roadSub: roadOpt ? roadOpt.innerText : null,
+                vessel: w.querySelector('.inp-vessel').value, plate: w.querySelector('.inp-plate').value, 
+                booking: w.querySelector('.inp-booking').value, container: w.querySelector('.inp-container').value,
+                freight: w.querySelector('.inp-freight').value, freightCurr: w.querySelector('.inp-freight-curr').value,
+                value: w.querySelector('.inp-value').value, valueCurr: w.querySelector('.inp-value-curr').value,
+                insurance: w.querySelector('.inp-insurance').value, insuranceCurr: w.querySelector('.inp-insurance-curr').value,
+                dateLoad: w.querySelector('.date-load').value, dateEdt: w.querySelector('.date-edt').value, dateEta: w.querySelector('.date-eta').value,
+                totalDays: w.querySelector('.res-total').innerText.replace(' Gün',''),
+                pcs: w.querySelector('.inp-pcs').value, pallet: w.querySelector('.inp-pallet').value, net: w.querySelector('.inp-net').value, gross: w.querySelector('.inp-gross').value,
+                manualScore: w.querySelector('.manual-score').innerText, images: imgs, sTags: sTags, pTags: pTags
+            };
+        }
+
+        function fillCardData(w, d) {
+            if(d.timestamp) w.dataset.timestamp = d.timestamp;
+            w.querySelector('.inp-company').value = d.company || ""; 
+            
+            let cSel = w.querySelector('.country-select');
+            let fullCountry = d.countryName ? `${d.country} - ${d.countryName}` : d.country;
+            cSel.value = fullCountry || ""; 
+            
+            w.querySelector('.inp-city').value = d.city || "";
+            w.querySelector('.inp-invoice').value = d.invoice || ""; if(d.dateInvoice) w.querySelector('.date-invoice').value = d.dateInvoice;
+            w.querySelector('.inp-incoterm').value = d.incoterm || "FCA"; handleIncoterm(w.querySelector('.inp-incoterm'));
+            w.querySelector('.inp-forwarder').value = d.forwarder || ""; w.querySelector('.mode-select').value = d.mode || "Tır"; handleModeChange(w.querySelector('.mode-select'));
+            if(d.roadSub) { w.querySelectorAll('.sub-opt').forEach(o => { if(o.innerText.includes(d.roadSub.trim())) o.classList.add('selected'); }); }
+            w.querySelector('.inp-vessel').value = d.vessel || ""; if(d.plate) w.querySelector('.inp-plate').value = d.plate;
+            
+            if(d.booking) w.querySelector('.inp-booking').value = d.booking;
+            if(d.container) w.querySelector('.inp-container').value = d.container;
+
+            w.querySelector('.inp-freight').value = d.freight || ""; w.querySelector('.inp-freight-curr').value = d.freightCurr || "EUR";
+            w.querySelector('.inp-value').value = d.value || ""; w.querySelector('.inp-value-curr').value = d.valueCurr || "EUR";
+            w.querySelector('.inp-insurance').value = d.insurance || ""; w.querySelector('.inp-insurance-curr').value = d.insuranceCurr || "EUR";
+            w.querySelector('.date-load').value = d.dateLoad || ""; w.querySelector('.date-edt').value = d.dateEdt || ""; w.querySelector('.date-eta').value = d.dateEta || "";
+            w.querySelector('.inp-pcs').value = d.pcs || ""; w.querySelector('.inp-pallet').value = d.pallet || ""; w.querySelector('.inp-net').value = d.net || ""; w.querySelector('.inp-gross').value = d.gross || "";
+            
+            if(d.images) { let c = w.querySelector('.photo-preview-container'); d.images.forEach(src => createPhotoElement(c, src)); }
+            if(d.sTags) { w.querySelectorAll('.status-tags .tag').forEach(t => { 
+                if(d.sTags.includes(t.innerText)) {
+                    t.classList.add('selected');
+                    if(t.innerText === "Sigorta Yapıldı") w.querySelector('.insurance-wrapper').style.display = 'block';
+                }
+            }); }
+            if(d.pTags) { w.querySelectorAll('.perf-tags-container .perf-tag').forEach(t => { if(d.pTags.includes(t.innerText)) t.classList.add('selected'); }); }
+            
+            w.querySelector('.manual-score').innerText = d.manualScore || "0.0";
+            if(d.dateLoad) calculateDates(w.querySelector('.date-load'));
+        }
+
+        // --- UI LOGIC ---
+        function toggleDetails(row) {
+            let w = row.closest('.shipment-wrapper'); let wasOpen = w.classList.contains('open');
+            document.querySelectorAll('.shipment-wrapper').forEach(el => { el.classList.remove('open'); el.querySelector('.shipment-row').classList.remove('active'); });
+            if(!wasOpen) { w.classList.add('open'); row.classList.add('active'); }
+        }
+
+        function updateRowSummary(wrapper) {
+            let w = wrapper.closest ? wrapper : wrapper.closest('.shipment-wrapper');
+            let row = w.querySelector('.shipment-row');
+            
+            w.querySelector('.sum-company').innerText = w.querySelector('.inp-company').value || "Belirsiz";
+            w.querySelector('.sum-invoice').innerText = w.querySelector('.inp-invoice').value || "-";
+            w.querySelector('.sum-forwarder').innerText = w.querySelector('.inp-forwarder').value || "-";
+            w.querySelector('.sum-mode').innerText = w.querySelector('.mode-select').value;
+            
+            let dL = w.querySelector('.date-load').value; w.querySelector('.sum-load').innerText = dL ? new Date(dL).toLocaleDateString('tr-TR') : "-";
+            let dEdt = w.querySelector('.date-edt').value; w.querySelector('.sum-edt').innerText = dEdt ? new Date(dEdt).toLocaleDateString('tr-TR') : "-";
+            let dEta = w.querySelector('.date-eta').value; w.querySelector('.sum-eta').innerText = dEta ? new Date(dEta).toLocaleDateString('tr-TR') : "-";
+            
+            w.querySelector('.sum-pcs').innerText = w.querySelector('.inp-pcs').value || "-";
+            w.querySelector('.sum-pallet').innerText = w.querySelector('.inp-pallet').value || "-";
+            w.querySelector('.sum-net').innerText = w.querySelector('.inp-net').value || "-";
+            w.querySelector('.sum-gross').innerText = w.querySelector('.inp-gross').value || "-";
+            
+            let fr = w.querySelector('.inp-freight').value || "0"; let curr = w.querySelector('.inp-freight-curr').value;
+            w.querySelector('.sum-freight').innerText = fr + " " + curr;
+            w.querySelector('.sum-score').innerText = w.querySelector('.manual-score').innerText + " ★";
+
+            let incoterm = w.querySelector('.inp-incoterm').value;
+            if(incoterm === 'EXW' || incoterm === 'FCA') row.classList.add('row-buyer-resp'); else row.classList.remove('row-buyer-resp');
+            
+            let isDelivered = false;
+            w.querySelectorAll('.status-tags .tag.selected').forEach(t => {
+                if(t.innerText === "Teslim Edildi") isDelivered = true;
+            });
+            w.dataset.tabStatus = isDelivered ? 'delivered' : 'active';
+            if(isDelivered) row.classList.add('row-delivered'); else row.classList.remove('row-delivered');
+
+            filterCards(); 
+        }
+
+        function filterCards() {
+            let term = document.getElementById('globalSearch').value.toLowerCase();
+            let mode = document.getElementById('filterMode').value;
+            let start = document.getElementById('filterStartDate').value; 
+            let end = document.getElementById('filterEndDate').value;
+            let activeTabBtn = document.querySelector('.tab-btn.active');
+            let currentTab = activeTabBtn ? activeTabBtn.dataset.tab : 'all';
+
+            document.querySelectorAll('.shipment-wrapper').forEach(w => {
+                let text = w.innerText.toLowerCase(); 
+                let cMode = w.querySelector('.mode-select').value; 
+                let dLoad = w.querySelector('.date-load').value;
+                let wTab = w.dataset.tabStatus || 'active';
+                
+                let mText = text.includes(term); 
+                let mMode = (mode === "") || (cMode === mode);
+                let mDate = true; if (start && dLoad && dLoad < start) mDate = false; if (end && dLoad && dLoad > end) mDate = false;
+                let mTab = (currentTab === 'all') || (wTab === currentTab);
+
+                w.style.display = (mText && mMode && mDate && mTab) ? "block" : "none";
+            });
+        }
+
+        function clearFilters() { document.getElementById('globalSearch').value = ""; document.getElementById('filterMode').value = ""; document.getElementById('filterStartDate').value = ""; document.getElementById('filterEndDate').value = ""; filterCards(); }
+
+        function handleModeChange(select) {
+            let w = select.closest('.shipment-wrapper'); let val = select.value;
+            let vessel = w.querySelector('.inp-vessel'); let plate = w.querySelector('.inp-plate'); let roadOpts = w.querySelector('.road-options');
+            let seaFields = w.querySelector('.sea-fields');
+
+            if(val === "Gemi") { 
+                vessel.style.display = "block"; plate.style.display = "none"; roadOpts.style.display = "none"; 
+                seaFields.style.display = "block"; 
+            } else if(val === "Tır" || val === "Minivan") { 
+                vessel.style.display = "none"; plate.style.display = "block"; roadOpts.style.display = "flex"; 
+                seaFields.style.display = "none";
+            } else { 
+                vessel.style.display = "none"; plate.style.display = "none"; roadOpts.style.display = "none"; 
+                seaFields.style.display = "none";
+            }
+            updateRowSummary(w);
+        }
+
+        function addCard(data = null) {
+            const tpl = document.getElementById('cardTemplate').content.cloneNode(true);
+            const w = tpl.querySelector('.shipment-wrapper');
+            w.dataset.timestamp = Date.now(); 
+            const photoBtn = w.querySelector('.photo-btn');
+            const fileInp = w.querySelector('input[type="file"]');
+            photoBtn.onclick = () => fileInp.click();
+
+            document.getElementById('cardContainer').prepend(w);
+            if(data) fillCardData(w, data);
+            updateRowSummary(w);
+            if(!data) { toggleDetails(w.querySelector('.shipment-row')); filterCards(); }
+            return w;
+        }
+
+        function cloneCard(btn) { let source = btn.closest('.shipment-wrapper'); let data = extractCardData(source); data.invoice = ""; data.images = []; addCard(data); showToast("Kopyalandı (En üste eklendi)"); }
+        function selectSubOpt(el, val) { el.parentNode.querySelectorAll('.sub-opt').forEach(s => s.classList.remove('selected')); el.classList.add('selected'); }
+        
+        function toggleTag(el) { 
+            el.classList.toggle('selected'); 
+            let w = el.closest('.shipment-wrapper');
+            if(el.innerText === "Sigorta Yapıldı") {
+                let wrapper = w.querySelector('.insurance-wrapper');
+                wrapper.style.display = el.classList.contains('selected') ? 'block' : 'none';
+            }
+            updateRowSummary(w); 
+        }
+        
+        function formatCurrency(inp) { let val = inp.value.replace(/\./g, '').replace(',', '.').replace(/[^0-9.]/g, ''); if(!val) return; inp.value = parseFloat(val).toLocaleString('tr-TR', {minimumFractionDigits:2, maximumFractionDigits:2}); updateRowSummary(inp); }
+
+        function calculateDates(input) {
+            let w = input.closest('.shipment-wrapper');
+            let dLoad = w.querySelector('.date-load').valueAsDate; let dEta = w.querySelector('.date-eta').valueAsDate;
+            if(dLoad && dEta) { let days = Math.round((dEta - dLoad)/86400000); w.querySelector('.res-total').innerText = days + " Gün"; calculateAutoScore(input, days); } 
+            else { w.querySelector('.res-total').innerText = "-"; updateStars(w, 0, "Tarih Eksik"); }
+            updateRowSummary(w);
+        }
+
+        function handleIncoterm(select) {
+            let w = select.closest('.shipment-wrapper'); let fwd = w.querySelector('.inp-forwarder');
+            if(select.value === 'EXW') { fwd.value = "ALICI SORUMLU"; fwd.setAttribute("readonly", true); fwd.style.background = "#e2e8f0"; } 
+            else { if(fwd.value.includes("ALICI")) fwd.value = ""; fwd.removeAttribute("readonly"); fwd.style.background = "#f8fafc"; }
+            updateRowSummary(w);
+        }
+
+        function calculateAutoScore(trigger, durationOverride) {
+            let w = trigger.closest('.shipment-wrapper');
+            let incoterm = w.querySelector('.inp-incoterm').value;
+            if(incoterm === 'EXW' || incoterm === 'FCA') { updateStars(w, 0, "Alıcı Sor."); w.querySelector('.manual-score').innerText = "0.0"; updateRowSummary(w); return; }
+            
+            updateDisplayScore(w);
+            let durText = w.querySelector('.res-total').innerText;
+            let actualDays = durationOverride !== undefined ? durationOverride : (durText !== "-" ? parseInt(durText) : 0);
+            if(actualDays <= 0) return;
+
+            let countryVal = w.querySelector('.country-select').value;
+            let country = countryVal.includes(" - ") ? countryVal.split(" - ")[0] : countryVal;
+            let mode = w.querySelector('.mode-select').value;
+            if(!country || !mode) return;
+
+            // AI HEDEF HESAPLAMA MANTIĞI
+            let baseTarget = (transitTargets[country] && transitTargets[country][mode]) ? transitTargets[country][mode] : (defaultTargets[mode] || 14);
+
+            let ratio = actualDays / baseTarget;
+            let stars = 0, text = "";
+
+            if(ratio <= 0.85) { stars = 5; text = "Mükemmel"; }
+            else if(ratio <= 1.05) { stars = 4; text = "Zamanında"; }
+            else if(ratio <= 1.25) { stars = 3; text = "Normal"; }
+            else if(ratio <= 1.50) { stars = 2; text = "Gecikmeli"; }
+            else { stars = 1; text = "Kritik"; }
+
+            updateStars(w, stars, text + ` (Hdf:${baseTarget})`);
+        }
+
+        function updateStars(w, count, text) {
+            w.dataset.baseStars = count;
+            let html = ""; for(let i=0; i<5; i++) html += (i < count) ? '<span class="filled">★</span>' : '<span>★</span>';
+            w.querySelector('.star-rating').innerHTML = html + ` <span class="autoScoreText" style="font-size:10px; color:#64748b;">${text}</span>`;
+            if(text !== "Alıcı Sor.") updateDisplayScore(w);
+        }
+
+        function toggleScoreTag(el) { el.classList.toggle('selected'); updateDisplayScore(el.closest('.shipment-wrapper')); }
+        function updateDisplayScore(w) {
+            let base = parseFloat(w.dataset.baseStars) || 0; let modifier = 0;
+            w.querySelectorAll('.perf-tag.selected').forEach(t => modifier += parseFloat(t.dataset.val));
+            let final = base + modifier; if(final<0) final=0; if(final>5) final=5;
+            w.querySelector('.manual-score').innerText = final.toFixed(1);
+            updateRowSummary(w);
+        }
+
+        function handleImageUpload(input) {
+            const w = input.closest('.shipment-wrapper'); const container = w.querySelector('.photo-preview-container'); const files = input.files;
+            if (container.children.length + files.length > 2) { showToast("Max 2 fotoğraf!", "error"); return; }
+            Array.from(files).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image(); img.src = e.target.result;
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d');
+                        const scaleSize = 600 / img.width; canvas.width = 600; canvas.height = img.height * scaleSize;
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        createPhotoElement(container, canvas.toDataURL('image/jpeg', 0.6));
+                    }
+                }; reader.readAsDataURL(file);
+            }); input.value = "";
+        }
+        function createPhotoElement(container, src) {
+            const wrapper = document.createElement('div'); wrapper.className = 'photo-item';
+            const thumb = document.createElement('img'); thumb.src = src; thumb.className = 'photo-thumb'; thumb.onclick = function() { document.getElementById("imgModal").style.display="block"; document.getElementById("imgFull").src=src; };
+            const delBtn = document.createElement('button'); delBtn.className = 'btn-rm-img'; delBtn.innerHTML = '✕'; delBtn.onclick = function() { wrapper.remove(); };
+            wrapper.appendChild(thumb); wrapper.appendChild(delBtn); container.appendChild(wrapper);
+        }
+
+        function deleteCard(btn) {
+            if(confirm('Silinecek?')) {
+                let w = btn.closest('.shipment-wrapper');
+                w.remove(); showToast("Silindi."); saveData(true);
+            }
+        }
+        function saveAndCloseCard(btn) {
+            saveData(true); // Veriyi sessizce kaydeder
+            showToast("Sevkiyat kaydedildi.");
+            let w = btn.closest('.shipment-wrapper');
+            w.classList.remove('open');
+            w.querySelector('.shipment-row').classList.remove('active');
+        }
+        function addNewItem(btn, listId) {
+            let val = btn.previousElementSibling.value.trim().toUpperCase();
+            if(!val) return; let list = document.getElementById(listId);
+            for(let opt of list.options) if(opt.value === val) return showToast("Zaten listede var.", "info");
+            let opt = document.createElement('option'); opt.value = val; list.appendChild(opt); showToast("Eklendi: " + val);
+        }
+
+        // --- REPORT & ANALİZ ---
+        function addMoney(dict, curr, amountStr) {
+            let val = parseFloat((amountStr||"0").replace(/\./g, '').replace(',', '.')) || 0;
+            if(!dict[curr]) dict[curr] = 0; dict[curr] += val;
+        }
+
+       function openReportDashboard() {
+            let cards = [];
+            document.querySelectorAll('.shipment-wrapper').forEach(w => {
+                // FİLTRE KALDIRILDI: Görünür olup olmadığına bakılmaksızın tüm sevkiyatlar alınır
+                cards.push(extractCardData(w));
+            });
+
+            if(cards.length === 0) return showToast("Raporlanacak veri yok.", "error");
+
+            let stats = {
+                totalCount: cards.length, totalPallet: 0, totalPcs: 0, totalWeight: 0,
+                totalDays: 0, daysCount: 0, totalScore: 0, scoreCount: 0,
+                freightByCurr: {}, valueByCurr: {}, insuranceByCurr: {},
+                forwarders: {}, clients: {}, countries: {}, modes: {}, incoterms: {}, months: {}
+            };
+
+            cards.forEach(c => {
+                stats.totalPallet += parseFloat(c.pallet) || 0;
+                stats.totalPcs += parseFloat(c.pcs) || 0;
+                stats.totalWeight += parseFloat((c.gross||"0").replace('.','').replace(',','.')) || 0;
+                
+                let days = parseInt(c.totalDays);
+                if(!isNaN(days)) { stats.totalDays += days; stats.daysCount++; }
+
+                let score = parseFloat(c.manualScore);
+                if(score > 0) { stats.totalScore += score; stats.scoreCount++; }
+
+                addMoney(stats.freightByCurr, c.freightCurr, c.freight);
+                addMoney(stats.valueByCurr, c.valueCurr, c.value);
+                addMoney(stats.insuranceByCurr, c.insuranceCurr, c.insurance);
+
+                let fwdName = c.forwarder || (c.incoterm ? c.incoterm + " (Alıcı Ödemeli)" : "Belirsiz");
+                if(!stats.forwarders[fwdName]) stats.forwarders[fwdName] = { count: 0, totalDays:0, dayCount:0, totalScore:0, scoreCount:0, totalWeight:0, totalFreightMap: {} };
+                let f = stats.forwarders[fwdName];
+                f.count++; f.totalWeight += parseFloat((c.gross||"0").replace('.','').replace(',','.')) || 0;
+                addMoney(f.totalFreightMap, c.freightCurr, c.freight);
+                if(!isNaN(days)) { f.totalDays += days; f.dayCount++; } if(score > 0) { f.totalScore += score; f.scoreCount++; }
+
+                let client = c.company || "Belirsiz";
+                if(!stats.clients[client]) stats.clients[client] = { count:0, country: c.country, weight:0, pieces:0, totalSalesMap: {}, totalValForSort: 0 };
+                stats.clients[client].count++; stats.clients[client].weight += parseFloat((c.gross||"0").replace('.','').replace(',','.')) || 0; stats.clients[client].pieces += parseFloat(c.pcs) || 0;
+                addMoney(stats.clients[client].totalSalesMap, c.valueCurr, c.value);
+                stats.clients[client].totalValForSort += parseFloat((c.value||"0").replace('.','').replace(',','.')) || 0;
+
+                let cCode = c.country || "TR"; 
+                let cName = c.countryName || cCode;
+                if(!stats.countries[cCode]) stats.countries[cCode] = { name: cName, count:0, weight:0, pieces:0, totalSalesMap: {}, totalValForSort: 0, companies: new Set() };
+                stats.countries[cCode].count++; stats.countries[cCode].weight += parseFloat((c.gross||"0").replace('.','').replace(',','.')) || 0; stats.countries[cCode].pieces += parseFloat(c.pcs) || 0;
+                addMoney(stats.countries[cCode].totalSalesMap, c.valueCurr, c.value);
+                stats.countries[cCode].totalValForSort += parseFloat((c.value||"0").replace('.','').replace(',','.')) || 0;
+                if(client !== "Belirsiz") stats.countries[cCode].companies.add(client);
+
+                let mode = c.mode || "Diğer"; if(!stats.modes[mode]) stats.modes[mode] = { count:0, weight:0, pieces:0, totalFreightMap: {} };
+                stats.modes[mode].count++; stats.modes[mode].weight += parseFloat((c.gross||"0").replace('.','').replace(',','.')) || 0; stats.modes[mode].pieces += parseFloat(c.pcs) || 0;
+                addMoney(stats.modes[mode].totalFreightMap, c.freightCurr, c.freight);
+
+                let term = c.incoterm || "Diğer"; if(!stats.incoterms[term]) stats.incoterms[term] = { count:0, weight:0, pieces:0, totalFreightMap: {} };
+                stats.incoterms[term].count++; stats.incoterms[term].weight += parseFloat((c.gross||"0").replace('.','').replace(',','.')) || 0; stats.incoterms[term].pieces += parseFloat(c.pcs) || 0;
+                addMoney(stats.incoterms[term].totalFreightMap, c.freightCurr, c.freight);
+
+                if(c.dateLoad) {
+                    let date = new Date(c.dateLoad); let key = date.toLocaleString('tr-TR', { month: 'short', year: '2-digit' });
+                    if(!stats.months[key]) stats.months[key] = { count:0, weight:0, pieces:0, totalSalesMap: {} };
+                    stats.months[key].count++; stats.months[key].weight += parseFloat((c.gross||"0").replace('.','').replace(',','.')) || 0; stats.months[key].pieces += parseFloat(c.pcs) || 0;
+                    addMoney(stats.months[key].totalSalesMap, c.valueCurr, c.value);
+                }
+            });
+
+            document.getElementById('reportDate').innerHTML = `Tarih: ${new Date().toLocaleDateString('tr-TR')}`;
+            let modal = document.getElementById('reportModal'); modal.style.display = 'block'; setTimeout(() => modal.classList.add('show'), 10);
+
+            let avgDay = stats.daysCount ? (stats.totalDays / stats.daysCount).toFixed(1) : "-";
+            let avgScore = stats.scoreCount ? (stats.totalScore / stats.scoreCount).toFixed(1) : "-";
+            document.getElementById('kpiArea').innerHTML = `
+                <div class="kpi-card"><div class="kpi-label">Toplam İşlem</div><div class="kpi-value">${stats.totalCount}</div></div>
+                <div class="kpi-card"><div class="kpi-label">Toplam Parça</div><div class="kpi-value">${stats.totalPcs.toLocaleString('tr-TR')}</div></div>
+                <div class="kpi-card"><div class="kpi-label">Toplam Yük</div><div class="kpi-value">${stats.totalPallet.toLocaleString('tr-TR')} Palet</div></div>
+                <div class="kpi-card"><div class="kpi-label">Ortalama Süre</div><div class="kpi-value">${avgDay} Gün</div></div>
+                <div class="kpi-card"><div class="kpi-label">Genel Başarı</div><div class="kpi-value" style="color:var(--primary)">${avgScore} ★</div></div>
+            `;
+
+            let financeHtml = "", fHtml = "", vHtml = "", iHtml = "";
+            for (const [curr, val] of Object.entries(stats.freightByCurr)) { if(val > 0) fHtml += `<div class="finance-row"><span>${curr}</span><span>${val.toLocaleString('tr-TR')}</span></div>`; }
+            if(fHtml) financeHtml += `<div class="finance-group"><div class="finance-title">Ödenen Navlunlar</div>${fHtml}</div>`;
+            for (const [curr, val] of Object.entries(stats.valueByCurr)) { if(val > 0) vHtml += `<div class="finance-row"><span>${curr}</span><span>${val.toLocaleString('tr-TR')}</span></div>`; }
+            if(vHtml) financeHtml += `<div class="finance-group"><div class="finance-title">Mal Bedelleri (Ciro)</div>${vHtml}</div>`;
+            for (const [curr, val] of Object.entries(stats.insuranceByCurr)) { if(val > 0) iHtml += `<div class="finance-row"><span>${curr}</span><span>${val.toLocaleString('tr-TR')}</span></div>`; }
+            if(iHtml) financeHtml += `<div class="finance-group"><div class="finance-title" style="color:#c2410c">Poliçe Bedelleri</div>${iHtml}</div>`;
+            document.getElementById('financeArea').innerHTML = financeHtml || "<span style='color:#999'>Finansal veri bulunamadı.</span>";
+
+            let modeHtml = ""; let maxModeCount = Math.max(...Object.values(stats.modes).map(m=>m.count)) || 1;
+            for(const [label, data] of Object.entries(stats.modes)) {
+                let width = (data.count / maxModeCount) * 100;
+                let freightStr = Object.entries(data.totalFreightMap).filter(([k,v]) => v > 0).map(([k,v]) => `${v.toLocaleString('tr-TR', {maximumFractionDigits:0})} ${k}`).join(' + ');
+                modeHtml += `<div class="rich-table-row"><span>${label}</span><div class="bar-container"><span style="width:30px; font-weight:bold;">${data.count}</span><div class="mini-bar-track"><div class="mini-bar-fill" style="width:${width}%"></div></div></div><span class="text-right">${data.weight.toLocaleString('tr-TR')} KG</span><span class="text-right">${data.pieces.toLocaleString('tr-TR')} Ad.</span><span class="text-right" style="font-weight:700; color:#4f46e5;">${freightStr||"-"}</span></div>`;
+            }
+            document.getElementById('modeTable').innerHTML = modeHtml;
+
+            let incotermHtml = ""; let maxIncoCount = Math.max(...Object.values(stats.incoterms).map(m=>m.count)) || 1;
+            for(const [label, data] of Object.entries(stats.incoterms)) {
+                let width = (data.count / maxIncoCount) * 100;
+                let freightStr = Object.entries(data.totalFreightMap).filter(([k,v]) => v > 0).map(([k,v]) => `${v.toLocaleString('tr-TR', {maximumFractionDigits:0})} ${k}`).join(' + ');
+                incotermHtml += `<div class="rich-table-row"><span>${label}</span><div class="bar-container"><span style="width:30px; font-weight:bold;">${data.count}</span><div class="mini-bar-track"><div class="mini-bar-fill" style="width:${width}%"></div></div></div><span class="text-right">${data.weight.toLocaleString('tr-TR')} KG</span><span class="text-right">${data.pieces.toLocaleString('tr-TR')} Ad.</span><span class="text-right" style="font-weight:700; color:#4f46e5;">${freightStr||"-"}</span></div>`;
+            }
+            document.getElementById('incotermTable').innerHTML = incotermHtml;
+
+            let monthHtml = ""; let maxMonthCount = Math.max(...Object.values(stats.months).map(m=>m.count)) || 1;
+            for(const [label, data] of Object.entries(stats.months)) {
+                let width = (data.count / maxMonthCount) * 100;
+                let salesStr = Object.entries(data.totalSalesMap).filter(([k,v]) => v > 0).map(([k,v]) => `${v.toLocaleString('tr-TR', {maximumFractionDigits:0})} ${k}`).join(' + ');
+                monthHtml += `<div class="rich-table-row"><span>${label}</span><div class="bar-container"><span style="width:30px; font-weight:bold;">${data.count}</span><div class="mini-bar-track"><div class="mini-bar-fill" style="width:${width}%"></div></div></div><span class="text-right">${data.weight.toLocaleString('tr-TR')} KG</span><span class="text-right">${data.pieces.toLocaleString('tr-TR')} Ad.</span><span class="text-right" style="font-weight:700; color:#10b981;">${salesStr||"-"}</span></div>`;
+            }
+            document.getElementById('monthTable').innerHTML = monthHtml;
+
+            let fwdHtml = "";
+            for(const [name, d] of Object.entries(stats.forwarders)) {
+                let fAvgTime = d.dayCount ? (d.totalDays/d.dayCount).toFixed(1) : "-";
+                let fAvgScore = d.scoreCount ? (d.totalScore/d.scoreCount).toFixed(1) : "-";
+                let freightStr = Object.entries(d.totalFreightMap).filter(([k,v]) => v > 0).map(([k,v]) => `${v.toLocaleString('tr-TR', {maximumFractionDigits:0})} ${k}`).join(' + ');
+                fwdHtml += `<tr><td>${name}</td><td class="text-right">${d.count}</td><td class="text-right">${d.totalWeight.toLocaleString('tr-TR')} KG</td><td class="text-right" style="font-weight:600; color:#4f46e5">${freightStr||"-"}</td><td class="text-right">${fAvgTime} Gün</td><td class="text-right"><strong>${fAvgScore}</strong></td></tr>`;
+            }
+            document.getElementById('forwarderTableBody').innerHTML = fwdHtml;
+
+            let clientHtml = "";
+            let sortedClients = Object.entries(stats.clients).sort((a,b) => b[1].totalValForSort - a[1].totalValForSort);
+            for(const [name, d] of sortedClients) {
+                let flagImg = d.country ? `<img src="https://flagcdn.com/20x15/${d.country.toLowerCase()}.png" style="vertical-align:middle; margin-right:5px; border-radius:2px;" onerror="this.style.display='none'">` : '';
+                let salesStr = Object.entries(d.totalSalesMap).filter(([k,v]) => v > 0).map(([k,v]) => `${v.toLocaleString('tr-TR', {maximumFractionDigits:0})} ${k}`).join(' + ');
+                clientHtml += `<tr><td>${name}</td><td>${flagImg}${d.country || '-'}</td><td class="text-right">${d.count}</td><td class="text-right">${d.pieces.toLocaleString('tr-TR')} Ad.</td><td class="text-right">${d.weight.toLocaleString('tr-TR')} KG</td><td class="text-right" style="font-weight:700; color:#10b981;">${salesStr||"-"}</td></tr>`;
+            }
+            document.getElementById('clientTableBody').innerHTML = clientHtml;
+
+            let countryHtml = ""; let countryVisualHtml = "";
+            let sortedCountries = Object.entries(stats.countries).sort((a,b) => b[1].totalValForSort - a[1].totalValForSort);
+            let maxCountryVal = sortedCountries.length > 0 ? sortedCountries[0][1].totalValForSort : 1;
+
+            for(const [code, d] of sortedCountries) {
+                let salesStr = Object.entries(d.totalSalesMap).filter(([k,v]) => v > 0).map(([k,v]) => `${v.toLocaleString('tr-TR', {maximumFractionDigits:0})} ${k}`).join(' + ');
+                let flagImg = code ? `<img src="https://flagcdn.com/20x15/${code.toLowerCase()}.png" style="vertical-align:middle; margin-right:5px; border-radius:2px;" onerror="this.style.display='none'">` : '';
+                countryHtml += `<tr><td>${flagImg}${d.name}</td><td class="text-right">${d.count}</td><td class="text-right">${d.weight.toLocaleString('tr-TR')} KG</td><td class="text-right">${d.pieces.toLocaleString('tr-TR')}</td><td class="text-right" style="font-weight:700; color:#10b981;">${salesStr||"-"}</td></tr>`;
+                let percent = (d.totalValForSort / maxCountryVal) * 100;
+                countryVisualHtml += `<div class="visual-chart-row"><div class="v-label">${flagImg}${d.name}</div><div class="v-bar-area"><div class="v-bar-fill" style="width:${percent}%">${salesStr||"-"}</div></div><div class="v-value">${d.count} Sefer</div></div>`;
+            }
+            document.getElementById('countryTableBody').innerHTML = countryHtml;
+            document.getElementById('countryVisualChart').innerHTML = countryVisualHtml;
+
+            setTimeout(() => { drawMap(stats.countries); }, 300);
+        }
+
+        function drawMap(countriesData) {
+            let dataArray = [['Country', 'Total Weight', {role: 'tooltip', p:{html:true}}]];
+            for (const [country, d] of Object.entries(countriesData)) {
+                if(!country) continue;
+                let salesStr = Object.entries(d.totalSalesMap).filter(([k,v]) => v > 0).map(([k,v]) => `${v.toLocaleString('tr-TR', {maximumFractionDigits:0})} ${k}`).join(' + ');
+                let comps = Array.from(d.companies).join(', ');
+                let companyListHTML = comps ? `<div style="font-size:10px; color:#555; margin-top:5px; border-top:1px solid #ddd; padding-top:3px;">🏢 <b>Firmalar:</b><br>${comps}</div>` : "";
+                
+                let tooltipHTML = `<div style="padding:10px; font-family:Inter, sans-serif;">
+                    <strong style="font-size:14px; display:block; border-bottom:1px solid #ddd; padding-bottom:5px; margin-bottom:5px;">${country}</strong>
+                    <div style="font-size:12px;">📦 Sefer: <b>${d.count}</b></div>
+                    <div style="font-size:12px;">⚖️ Ağırlık: <b>${d.weight.toLocaleString('tr-TR')} KG</b></div>
+                    <div style="font-size:12px; color:#10b981; margin-top:5px;">💰 <b>${salesStr||"-"}</b></div>
+                    ${companyListHTML}
+                </div>`;
+                dataArray.push([country, d.weight, tooltipHTML]);
+            }
+            if(dataArray.length <= 1) return document.getElementById('regions_div').innerHTML = '<div style="text-align:center; padding:20px; color:#666;">Harita verisi yok.</div>';
+
+            if(typeof google !== 'undefined' && google.visualization) {
+                var chart = new google.visualization.GeoChart(document.getElementById('regions_div'));
+                chart.draw(google.visualization.arrayToDataTable(dataArray), { colorAxis: {colors: ['#93c5fd', '#1e3a8a']}, backgroundColor: '#f8fafc', tooltip: {isHtml: true}, legend: 'none' });
+            }
+        }
+        function loadCompaniesToManager() {
+            let companyData = JSON.parse(localStorage.getItem('coord_company_data')) || {};
+            let html = "";
+            for (const [name, details] of Object.entries(companyData)) {
+                let subText = [details.country, details.city].filter(Boolean).join(" - ");
+                html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #e2e8f0;">
+                            <div>
+                                <div style="font-weight:600; color:#1e293b;">${name}</div>
+                                <div style="font-size:10px; color:#64748b;">${subText || 'Detay Yok'}</div>
+                            </div>
+                            <div style="display:flex; gap:5px;">
+                                <button class="btn-clone" style="border:none; border-radius:4px; padding:4px 8px; font-size:10px; cursor:pointer;" onclick="editCompany('${name}')">✏️ Düzenle</button>
+                                <button class="btn-del" style="border:none; border-radius:4px; padding:4px 8px; font-size:10px; cursor:pointer;" onclick="removeCompany('${name}')">✕ Sil</button>
+                            </div>
+                         </div>`;
+            }
+            document.getElementById('companyManagerList').innerHTML = html || "<div style='color:#94a3b8; text-align:center;'>Kayıtlı firma yok.</div>";
+        }
+
+        function openCompanies() {
+            document.getElementById('companiesModal').style.display = 'block';
+            setTimeout(() => document.getElementById('companiesModal').classList.add('show'), 10);
+            loadCompaniesToManager();
+        }
+
+        function addCompany() {
+            let nameInp = document.getElementById('newCompanyName');
+            let countryInp = document.getElementById('newCompanyCountry');
+            let cityInp = document.getElementById('newCompanyCity');
+            
+            let name = nameInp.value.trim().toUpperCase();
+            if(!name) return showToast("Firma adı boş olamaz.", "error");
+            
+            let companyData = JSON.parse(localStorage.getItem('coord_company_data')) || {};
+            if(companyData[name]) return showToast("Bu firma zaten kayıtlı.", "warning");
+            
+            companyData[name] = { country: countryInp.value.trim().toUpperCase(), city: cityInp.value.trim().toUpperCase() };
+            localStorage.setItem('coord_company_data', JSON.stringify(companyData));
+            
+            nameInp.value = ""; countryInp.value = ""; cityInp.value = "";
+            refreshCompanyDatalist(); loadCompaniesToManager(); showToast("Firma eklendi.");
+        }
+
+        function editCompany(oldName) {
+            let companyData = JSON.parse(localStorage.getItem('coord_company_data')) || {};
+            let oldDetails = companyData[oldName] || {country:"", city:""};
+            
+            let newName = prompt("Firma Adı:", oldName);
+            if(newName === null) return; newName = newName.trim().toUpperCase();
+            if(!newName) return showToast("Firma adı boş olamaz", "error");
+
+            let newCountry = prompt("Ülke:", oldDetails.country);
+            if(newCountry === null) return; newCountry = newCountry.trim().toUpperCase();
+
+            let newCity = prompt("Şehir:", oldDetails.city);
+            if(newCity === null) return; newCity = newCity.trim().toUpperCase();
+
+            if(newName !== oldName && companyData[newName]) return showToast("Bu isimde başka firma var.", "error");
+
+            if(newName !== oldName) delete companyData[oldName];
+            companyData[newName] = { country: newCountry, city: newCity };
+            
+            localStorage.setItem('coord_company_data', JSON.stringify(companyData));
+            refreshCompanyDatalist(); loadCompaniesToManager(); showToast("Firma güncellendi.");
+        }
+
+        function removeCompany(name) {
+            if(!confirm(`"${name}" firmasını silmek istediğinize emin misiniz?`)) return;
+            let companyData = JSON.parse(localStorage.getItem('coord_company_data')) || {};
+            delete companyData[name];
+            localStorage.setItem('coord_company_data', JSON.stringify(companyData));
+            refreshCompanyDatalist(); loadCompaniesToManager(); showToast("Firma silindi.");
+        }
+
+        function refreshCompanyDatalist() {
+            let companyData = JSON.parse(localStorage.getItem('coord_company_data')) || {};
+            let list = document.getElementById('companyList'); list.innerHTML = "";
+            Object.keys(companyData).sort().forEach(name => {
+                let opt = document.createElement('option'); opt.value = name; list.appendChild(opt);
+            });
+        }
+
+        function loadSavedDatalists() {
+            let oldArr = JSON.parse(localStorage.getItem('coord_companies'));
+            let companyData = JSON.parse(localStorage.getItem('coord_company_data')) || {};
+            // Eski yedekteki sadece isim olan firmaları yakalayıp yeni sisteme geçirir
+            if(oldArr && Array.isArray(oldArr) && Object.keys(companyData).length === 0) {
+                oldArr.forEach(c => companyData[c] = {country:"", city:""});
+                localStorage.setItem('coord_company_data', JSON.stringify(companyData));
+            }
+            refreshCompanyDatalist();
+        }
+
+        function autoFillCompanyDetails(input) {
+            let val = input.value.trim().toUpperCase();
+            let companyData = JSON.parse(localStorage.getItem('coord_company_data')) || {};
+            if(companyData[val]) {
+                let w = input.closest('.shipment-wrapper');
+                let cSel = w.querySelector('.country-select'); let citySel = w.querySelector('.inp-city');
+                if(!cSel.value && companyData[val].country) cSel.value = companyData[val].country;
+                if(!citySel.value && companyData[val].city) citySel.value = companyData[val].city;
+                calculateAutoScore(cSel); updateRowSummary(w);
+            }
+        }
+
+       // --- FIREBASE KURULUMU VE AYARLARI ---
+        const firebaseConfig = {
+  apiKey: "AIzaSyCZrXxEpQJYSivErE08Qwj6x181xoBvoco",
+  authDomain: "coordinator-pro-8a993.firebaseapp.com",
+  projectId: "coordinator-pro-8a993",
+  storageBucket: "coordinator-pro-8a993.firebasestorage.app",
+  messagingSenderId: "528359969639",
+  appId: "1:528359969639:web:5808808baf39f00baf55c2"
+};
+        
+        if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+        const db = firebase.firestore();
+
+        // --- GİRİŞ VE ÇIKIŞ İŞLEMLERİ (AUTH) ---
+        firebase.auth().onAuthStateChanged(user => {
+            if(user) {
+                document.getElementById('loginScreen').style.display = 'none';
+                document.getElementById('appContent').style.display = 'block';
+                loadDataFromFirebase(); // Kullanıcı girer girmez buluttan veriyi çeker
+            } else {
+                document.getElementById('loginScreen').style.display = 'flex';
+                document.getElementById('appContent').style.display = 'none';
+            }
+        });
+
+        function loginWithFirebase() {
+            const e = document.getElementById('logEmail').value;
+            const p = document.getElementById('logPass').value;
+            if(!e || !p) return showToast("Lütfen E-Posta ve Şifre girin.", "warning");
+            
+            firebase.auth().signInWithEmailAndPassword(e, p)
+                .catch(err => showToast("Giriş Başarısız: " + err.message, "error"));
+        }
+
+        function logout() {
+            if(confirm("Sistemden çıkmak istediğinize emin misiniz?")) {
+                firebase.auth().signOut();
+            }
+        }
+
+        // --- BULUT VERİTABANI (FIRESTORE) KAYDETME VE YÜKLEME ---
+        // Eski saveData fonksiyonunu ezmek için buraya yazıyoruz
+        window.saveData = function(silent = false) {
+            if(!silent) showToast("Buluta kaydediliyor...", "info");
+            const cards = [];
+            document.querySelectorAll('.shipment-wrapper').forEach(w => {
+                cards.push(extractCardData(w));
+            });
+            const companyData = JSON.parse(localStorage.getItem('coord_company_data')) || {};
+            
+            // Tüm veriyi Firebase Firestore'a tek bir belge olarak yazıyoruz
+            db.collection("systemData").doc("mainBackup").set({
+                shipments: JSON.stringify(cards),
+                companies: JSON.stringify(companyData)
+            }).then(() => {
+                if(!silent) showToast('Veriler başarıyla buluta kaydedildi!');
+            }).catch(e => {
+                if(!silent) showToast('Kaydetme hatası: ' + e.message, 'error');
+            });
+        };
+
+        function loadDataFromFirebase() {
+            showToast("Buluttan veriler alınıyor...", "info");
+            db.collection("systemData").doc("mainBackup").get().then(doc => {
+                document.getElementById('cardContainer').innerHTML = ""; // Ekranı temizle
+                
+                if(doc.exists) {
+                    let data = doc.data();
+                    if(data.companies) localStorage.setItem('coord_company_data', data.companies);
+                    
+                    if(data.shipments) {
+                        let parsed = JSON.parse(data.shipments);
+                        // Tarihe göre sıralama mantığı
+                        parsed.sort((a, b) => {
+                            let tA = a.dateLoad ? new Date(a.dateLoad).getTime() : 0;
+                            let tB = b.dateLoad ? new Date(b.dateLoad).getTime() : 0;
+                            return tB - tA; 
+                        });
+                        parsed.forEach(d => addCard(d, true));
+                    } else { addCard(); }
+                } else {
+                    addCard(); // Eğer bulut tamamen boşsa boş bir kart aç
+                }
+                refreshCompanyDatalist();
+                applySettings();
+                filterCards();
+            }).catch(e => {
+                showToast("Veriler yüklenirken hata oluştu!", "error");
+            });
+        }
+
+        window.onload = () => {
+            loadSavedDatalists(); // Özel eklenen firmaları hafızadan çeker
+        };
+
+    </script>
+    </div> </body>
+</html>
