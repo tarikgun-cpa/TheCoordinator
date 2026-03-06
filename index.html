@@ -172,7 +172,13 @@
         .v-bar-area { flex:1; height:20px; background:#f1f5f9; border-radius:4px; overflow:hidden; position:relative; }
         .v-bar-fill { height:100%; background:var(--primary); color:white; font-size:10px; display:flex; align-items:center; padding-left:5px; font-weight:bold; white-space:nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
         .v-value { width:65px; text-align:right; font-weight:700; color:#64748b; }
-        @media print { body * { display:none!important; } #reportModal, #reportModal * { display:block!important; visibility:visible!important; position:static!important; } .report-content{margin:0; width:100%; box-shadow:none;} .btn-action{display:none!important;} }
+        @media print { 
+            body { visibility: hidden; background: white; } 
+            #reportModal { visibility: visible; position: absolute; left: 0; top: 0; width: 100%; background: white; z-index: 9999; } 
+            #reportModal * { visibility: visible; } 
+            .report-content { margin: 0; width: 100%; max-width: 100%; box-shadow: none; border: none; padding: 0; } 
+            .btn-action { display: none !important; } 
+        }
     </style>
 </head>
 <body>
@@ -669,9 +675,10 @@
             let countryCode = countryVal.includes(" - ") ? countryVal.split(" - ")[0] : countryVal;
             let countryName = countryVal.includes(" - ") ? countryVal.split(" - ")[1] : countryVal;
 
-            return {
+           return {
                 timestamp: w.dataset.timestamp ? Number(w.dataset.timestamp) : Date.now(),
                 company: w.querySelector('.inp-company').value, country: countryCode, countryName: countryName, city: w.querySelector('.inp-city').value,
+                mail: w.querySelector('.inp-mail').value,
                 invoice: w.querySelector('.inp-invoice').value, dateInvoice: w.querySelector('.date-invoice').value, incoterm: w.querySelector('.inp-incoterm').value,
                 forwarder: w.querySelector('.inp-forwarder').value, mode: w.querySelector('.mode-select').value, roadSub: roadOpt ? roadOpt.innerText : null,
                 vessel: w.querySelector('.inp-vessel').value, plate: w.querySelector('.inp-plate').value, 
@@ -695,6 +702,7 @@
             cSel.value = fullCountry || ""; 
             
             w.querySelector('.inp-city').value = d.city || "";
+            w.querySelector('.inp-mail').value = d.mail || "";
             w.querySelector('.inp-invoice').value = d.invoice || ""; if(d.dateInvoice) w.querySelector('.date-invoice').value = d.dateInvoice;
             w.querySelector('.inp-incoterm').value = d.incoterm || "FCA"; handleIncoterm(w.querySelector('.inp-incoterm'));
             w.querySelector('.inp-forwarder').value = d.forwarder || ""; w.querySelector('.mode-select').value = d.mode || "Tır"; handleModeChange(w.querySelector('.mode-select'));
@@ -730,11 +738,26 @@
             if(!wasOpen) { w.classList.add('open'); row.classList.add('active'); }
         }
 
-        function updateRowSummary(wrapper) {
+       function updateRowSummary(wrapper) {
             let w = wrapper.closest ? wrapper : wrapper.closest('.shipment-wrapper');
             let row = w.querySelector('.shipment-row');
             
-            w.querySelector('.sum-company').innerText = w.querySelector('.inp-company').value || "Belirsiz";
+            // Etiketleri (Tag) kontrol edip emoji ve teslimat durumunu belirleme
+            let isDelivered = false;
+            let hasMail = false;
+            let hasInsurance = false;
+            w.querySelectorAll('.status-tags .tag.selected').forEach(t => {
+                if(t.innerText === "Teslim Edildi") isDelivered = true;
+                if(t.innerText === "Evrak Mail Atıldı") hasMail = true;
+                if(t.innerText === "Sigorta Yapıldı") hasInsurance = true;
+            });
+
+            // Emojileri müşteri adının başına ekleme
+            let icons = "";
+            if(hasMail) icons += "📧 ";
+            if(hasInsurance) icons += "🛡️ ";
+            w.querySelector('.sum-company').innerText = icons + (w.querySelector('.inp-company').value || "Belirsiz");
+            
             w.querySelector('.sum-invoice').innerText = w.querySelector('.inp-invoice').value || "-";
             w.querySelector('.sum-forwarder').innerText = w.querySelector('.inp-forwarder').value || "-";
             w.querySelector('.sum-mode').innerText = w.querySelector('.mode-select').value;
@@ -755,10 +778,6 @@
             let incoterm = w.querySelector('.inp-incoterm').value;
             if(incoterm === 'EXW' || incoterm === 'FCA') row.classList.add('row-buyer-resp'); else row.classList.remove('row-buyer-resp');
             
-            let isDelivered = false;
-            w.querySelectorAll('.status-tags .tag.selected').forEach(t => {
-                if(t.innerText === "Teslim Edildi") isDelivered = true;
-            });
             w.dataset.tabStatus = isDelivered ? 'delivered' : 'active';
             if(isDelivered) row.classList.add('row-delivered'); else row.classList.remove('row-delivered');
 
@@ -1298,13 +1317,15 @@
                     
                     if(data.shipments) {
                         let parsed = JSON.parse(data.shipments);
-                        // Tarihe göre sıralama mantığı
+                        // KESİN ÇÖZÜM: Önce eskileri (tA - tB) sıralayıp diziyi oluşturuyoruz
                         parsed.sort((a, b) => {
                             let tA = a.dateLoad ? new Date(a.dateLoad).getTime() : 0;
                             let tB = b.dateLoad ? new Date(b.dateLoad).getTime() : 0;
-                            return tB - tA; 
+                            return tA - tB; 
                         });
-                        parsed.forEach(d => addCard(d, true));
+                        // Dizideki her elemanı DOM'un EN ÜSTÜNE (prepend) ekliyoruz (isLoad false göndererek). 
+                        // Böylece sıranın en sonundaki "en yeni" kayıt her zaman ekranın en üstüne çıkıyor.
+                        parsed.forEach(d => addCard(d, false));
                     } else { addCard(); }
                 } else {
                     addCard(); // Eğer bulut tamamen boşsa boş bir kart aç
