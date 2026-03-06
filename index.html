@@ -45,12 +45,24 @@
                 return showToast("Haritada gösterilecek yolda olan sevkiyat yok.", "info");
             }
 
-            // Koordinat hafızası (Sistemi yormamak için aynı yeri bir daha internetten aramaz)
-            let geoCache = JSON.parse(localStorage.getItem('coord_geocache')) || {};
-            
+            // --- YENİ EKLENEN KISIM: KONUMLARI GRUPLANDIRMA ---
+            let locationGroups = {};
             for(let c of activeCards) {
                 let locString = c.location && c.location.trim() !== "" ? c.location : "KÖRFEZ, KOCAELİ, TÜRKİYE";
                 let key = locString.toLowerCase().trim();
+                
+                if(!locationGroups[key]) {
+                    locationGroups[key] = { locString: locString, cards: [] };
+                }
+                locationGroups[key].cards.push(c);
+            }
+
+            // Koordinat hafızası (Sistemi yormamak için aynı yeri bir daha internetten aramaz)
+            let geoCache = JSON.parse(localStorage.getItem('coord_geocache')) || {};
+            
+            for(let key in locationGroups) {
+                let group = locationGroups[key];
+                let locString = group.locString;
                 let latlng = geoCache[key];
 
                 // Eğer hafızada koordinat yoksa internetten (OpenStreetMap) bul
@@ -70,36 +82,48 @@
 
                 // Koordinat bulunduysa haritaya Rozet (Pin) ekle
                 if(latlng) {
-                    let iconColor = c.mode === 'Gemi' ? '#0ea5e9' : (c.mode === 'Uçak' ? '#db2777' : (c.mode === 'Minivan' ? '#8b5cf6' : '#f59e0b'));
-                    let emoji = c.mode === 'Gemi' ? '🚢' : (c.mode === 'Uçak' ? '✈️' : (c.mode === 'Minivan' ? '🚐' : '🚛'));
+                    // Eğer bu konumda birden fazla araç varsa farklı stil, tek araç varsa kendi stilini verelim
+                    let isMulti = group.cards.length > 1;
+                    let firstCard = group.cards[0];
+
+                    let iconColor = isMulti ? '#1e293b' : (firstCard.mode === 'Gemi' ? '#0ea5e9' : (firstCard.mode === 'Uçak' ? '#db2777' : (firstCard.mode === 'Minivan' ? '#8b5cf6' : '#f59e0b')));
+                    let emoji = isMulti ? '📦' : (firstCard.mode === 'Gemi' ? '🚢' : (firstCard.mode === 'Uçak' ? '✈️' : (firstCard.mode === 'Minivan' ? '🚐' : '🚛')));
                     
+                    // Çoklu sevkiyatlarda sağ üstte küçük bir bildirim rozeti (badge)
+                    let badgeHtml = isMulti ? `<div style="position:absolute; top:-6px; right:-6px; background:var(--danger); color:white; border-radius:50%; width:18px; height:18px; font-size:11px; display:flex; align-items:center; justify-content:center; font-weight:bold; border:2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.3);">${group.cards.length}</div>` : '';
+
                     let customIcon = L.divIcon({
                         className: 'custom-map-marker',
-                        html: `<div style="background:${iconColor}; width:28px; height:28px; border-radius:50%; border:3px solid white; box-shadow: 0 3px 6px rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; font-size:14px;">${emoji}</div>`,
+                        html: `<div style="position:relative; background:${iconColor}; width:28px; height:28px; border-radius:50%; border:3px solid white; box-shadow: 0 3px 6px rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; font-size:14px;">${emoji}${badgeHtml}</div>`,
                         iconSize: [28, 28],
                         iconAnchor: [14, 14]
                     });
 
                     let marker = L.marker([latlng.lat, latlng.lon], {icon: customIcon});
                     
-                    // Tıklanınca açılacak bilgi penceresi
-                    let popupHtml = `
-                        <div style="font-family:Inter, sans-serif; font-size:12px; min-width:180px;">
-                            <strong style="color:var(--primary); font-size:14px;">🏢 ${c.company}</strong><br>
-                            <span style="color:#64748b; font-size:10px;">📄 ${c.invoice || "Fatura Yok"}</span><br>
-                            <hr style="border:0; border-top:1px dashed #cbd5e1; margin:6px 0;">
-                            📍 <b>Konum:</b> <span style="color:#eab308; font-weight:bold;">${locString}</span><br>
-                            🚚 <b>Nakliye:</b> ${c.forwarder || "Belirsiz"}<br>
-                            ⏱️ <b>ETA:</b> ${c.dateEta ? new Date(c.dateEta).toLocaleDateString('tr-TR') : "-"}
-                        </div>
-                    `;
+                    // --- YENİ EKLENEN KISIM: AÇILIR PENCEREDE LİSTELEME ---
+                    let popupHtml = `<div style="font-family:Inter, sans-serif; font-size:12px; min-width:200px; max-height:220px; overflow-y:auto; padding-right:5px;">`;
+                    popupHtml += `<h4 style="margin:0 0 8px 0; color:#1e293b; border-bottom:2px solid #e2e8f0; padding-bottom:5px; position:sticky; top:0; background:white; z-index:10;">📍 ${locString}</h4>`;
+                    
+                    for(let c of group.cards) {
+                        popupHtml += `
+                            <div style="margin-bottom:8px; padding-bottom:8px; border-bottom:1px dashed #cbd5e1;">
+                                <strong style="color:var(--primary); font-size:13px;">🏢 ${c.company}</strong><br>
+                                <span style="color:#64748b; font-size:10px;">📄 ${c.invoice || "Fatura Yok"}</span><br>
+                                🚚 <b>Nakliye:</b> ${c.forwarder || "Belirsiz"} (${c.mode})<br>
+                                ⏱️ <b>ETA:</b> ${c.dateEta ? new Date(c.dateEta).toLocaleDateString('tr-TR') : "-"}
+                            </div>
+                        `;
+                    }
+                    popupHtml += `</div>`;
+                    
                     marker.bindPopup(popupHtml);
                     markerGroup.addLayer(marker);
                 }
             }
 
             document.getElementById('mapLoadingInfo').style.display = 'none';
-            // Haritayı, tüm araçları aynı ekranda görecek şekilde otomatik yakınlaştır/uzaklaştır
+            // Haritayı otomatik yakınlaştır/uzaklaştır
             if(markerGroup.getLayers().length > 0) {
                 mapInstance.fitBounds(markerGroup.getBounds(), {padding: [50, 50]});
             }
