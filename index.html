@@ -1148,7 +1148,15 @@
                 </div>`;
             }
 
+            // --- EKSİK OLAN VE EKLENEN KISIM BURASI ---
+            document.getElementById('countryTableBody').innerHTML = countryHtml;
+            document.getElementById('countryVisualChart').innerHTML = countryVisualHtml;
+            drawMap(stats.countries);
+        } 
+        // ------------------------------------------
+
         function drawMap(countriesData) {
+
             let dataArray = [['Country', 'Total Weight', {role: 'tooltip', p:{html:true}}]];
             for (const [country, d] of Object.entries(countriesData)) {
                 if(!country) continue;
