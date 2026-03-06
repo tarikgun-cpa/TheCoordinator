@@ -14,6 +14,96 @@
     <script type="text/javascript">
         try { google.charts.load('current', { 'packages': ['geochart', 'corechart'] }); } 
         catch(e) { console.warn("Google Charts yüklenemedi."); }
+        let mapInstance = null;
+        let markerGroup = null;
+
+        async function openLiveMap() {
+            document.getElementById('liveMapModal').style.display = 'block';
+            setTimeout(() => document.getElementById('liveMapModal').classList.add('show'), 10);
+            
+            // Haritayı ilk kez oluştur
+            if(!mapInstance) {
+                mapInstance = L.map('leafletMap').setView([40.76, 29.80], 5); // Körfez odaklı
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                    attribution: 'The Coordinator'
+                }).addTo(mapInstance);
+                markerGroup = L.featureGroup().addTo(mapInstance);
+            }
+            
+            // Haritayı temizle ve bekleme ekranını aç
+            markerGroup.clearLayers();
+            document.getElementById('mapLoadingInfo').style.display = 'block';
+
+            // Yalnızca "Yolda Olan (Aktif)" sevkiyatları bul
+            let activeCards = [];
+            document.querySelectorAll('.shipment-wrapper').forEach(w => {
+                if(w.dataset.tabStatus === 'active') activeCards.push(extractCardData(w));
+            });
+
+            if(activeCards.length === 0) {
+                document.getElementById('mapLoadingInfo').style.display = 'none';
+                return showToast("Haritada gösterilecek yolda olan sevkiyat yok.", "info");
+            }
+
+            // Koordinat hafızası (Sistemi yormamak için aynı yeri bir daha internetten aramaz)
+            let geoCache = JSON.parse(localStorage.getItem('coord_geocache')) || {};
+            
+            for(let c of activeCards) {
+                let locString = c.location && c.location.trim() !== "" ? c.location : "KÖRFEZ, KOCAELİ, TÜRKİYE";
+                let key = locString.toLowerCase().trim();
+                let latlng = geoCache[key];
+
+                // Eğer hafızada koordinat yoksa internetten (OpenStreetMap) bul
+                if(!latlng) {
+                    try {
+                        // API engellemesine takılmamak için 1 saniye bekle
+                        await new Promise(r => setTimeout(r, 1000));
+                        let res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locString)}&limit=1`);
+                        let data = await res.json();
+                        if(data && data.length > 0) {
+                            latlng = {lat: data[0].lat, lon: data[0].lon};
+                            geoCache[key] = latlng;
+                            localStorage.setItem('coord_geocache', JSON.stringify(geoCache));
+                        }
+                    } catch(e) { console.warn("Konum bulunamadı:", locString); }
+                }
+
+                // Koordinat bulunduysa haritaya Rozet (Pin) ekle
+                if(latlng) {
+                    let iconColor = c.mode === 'Gemi' ? '#0ea5e9' : (c.mode === 'Uçak' ? '#db2777' : (c.mode === 'Minivan' ? '#8b5cf6' : '#f59e0b'));
+                    let emoji = c.mode === 'Gemi' ? '🚢' : (c.mode === 'Uçak' ? '✈️' : (c.mode === 'Minivan' ? '🚐' : '🚛'));
+                    
+                    let customIcon = L.divIcon({
+                        className: 'custom-map-marker',
+                        html: `<div style="background:${iconColor}; width:28px; height:28px; border-radius:50%; border:3px solid white; box-shadow: 0 3px 6px rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; font-size:14px;">${emoji}</div>`,
+                        iconSize: [28, 28],
+                        iconAnchor: [14, 14]
+                    });
+
+                    let marker = L.marker([latlng.lat, latlng.lon], {icon: customIcon});
+                    
+                    // Tıklanınca açılacak bilgi penceresi
+                    let popupHtml = `
+                        <div style="font-family:Inter, sans-serif; font-size:12px; min-width:180px;">
+                            <strong style="color:var(--primary); font-size:14px;">🏢 ${c.company}</strong><br>
+                            <span style="color:#64748b; font-size:10px;">📄 ${c.invoice || "Fatura Yok"}</span><br>
+                            <hr style="border:0; border-top:1px dashed #cbd5e1; margin:6px 0;">
+                            📍 <b>Konum:</b> <span style="color:#eab308; font-weight:bold;">${locString}</span><br>
+                            🚚 <b>Nakliye:</b> ${c.forwarder || "Belirsiz"}<br>
+                            ⏱️ <b>ETA:</b> ${c.dateEta ? new Date(c.dateEta).toLocaleDateString('tr-TR') : "-"}
+                        </div>
+                    `;
+                    marker.bindPopup(popupHtml);
+                    markerGroup.addLayer(marker);
+                }
+            }
+
+            document.getElementById('mapLoadingInfo').style.display = 'none';
+            // Haritayı, tüm araçları aynı ekranda görecek şekilde otomatik yakınlaştır/uzaklaştır
+            if(markerGroup.getLayers().length > 0) {
+                mapInstance.fitBounds(markerGroup.getBounds(), {padding: [50, 50]});
+            }
+        }
     </script>
 
     <style>
@@ -51,8 +141,6 @@
         .btn-action:active { transform: scale(0.96); }
         
         .btn-save { background: var(--success); } .btn-save:hover { background: #059669; }
-        .btn-excel { background: #15803d; } .btn-excel:hover { background: #166534; }
-        .btn-report { background: #0f172a; } .btn-report:hover { background: #334155; }
         .btn-settings { background: #e2e8f0; color: #475569; } .btn-settings:hover { background: #cbd5e1; }
         .btn-backup { background: #7c3aed; } .btn-backup:hover { background: #6d28d9; }
         .btn-restore { background: #db2777; } .btn-restore:hover { background: #be185d; }
@@ -75,9 +163,9 @@
         .container { max-width: 100%; margin: 0 auto; overflow-x: auto; }
         
         .list-container-inner { min-width: 1250px; }
-        .list-header { display: grid; grid-template-columns: 1.5fr 1.3fr 1.5fr 0.6fr 0.8fr 0.7fr 0.7fr 0.5fr 0.6fr 0.6fr 0.7fr 0.7fr 1.1fr 0.6fr; gap: 10px; padding: 10px 15px; background: #e2e8f0; border-radius: 8px; font-weight: 700; color: #475569; text-transform: uppercase; font-size: 10px; margin-bottom: 10px; }
+        .list-header { display: grid; grid-template-columns: 1.5fr 1.3fr 1.5fr 0.6fr 0.8fr 0.7fr 0.7fr 0.5fr 1.2fr 0.6fr 0.6fr 0.7fr 0.7fr 1.1fr 0.6fr; gap: 10px; padding: 10px 15px; background: #e2e8f0; border-radius: 8px; font-weight: 700; color: #475569; text-transform: uppercase; font-size: 10px; margin-bottom: 10px; }
         
-        .shipment-row { display: grid; grid-template-columns: 1.5fr 1.3fr 1.5fr 0.6fr 0.8fr 0.7fr 0.7fr 0.5fr 0.6fr 0.6fr 0.7fr 0.7fr 1.1fr 0.6fr; gap: 10px; background: white; padding: 12px 15px; border-radius: 8px; cursor: pointer; border: 1px solid #cbd5e1; align-items: center; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .shipment-row { display: grid; grid-template-columns: 1.5fr 1.3fr 1.5fr 0.6fr 0.8fr 0.7fr 0.7fr 0.5fr 1.2fr 0.6fr 0.6fr 0.7fr 0.7fr 1.1fr 0.6fr; gap: 10px; background: white; padding: 12px 15px; border-radius: 8px; cursor: pointer; border: 1px solid #cbd5e1; align-items: center; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         .shipment-wrapper { margin-bottom: 8px; transition: all 0.3s ease;}
         /* İKİNCİ shipment-row TANIMI SİLİNDİ! */
         .shipment-row:hover { background: #f8fafc; border-color: var(--primary); }
@@ -192,6 +280,8 @@
             .analysis-section { page-break-inside: avoid; margin-bottom: 20px; }
         }
     </style>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 </head>
 <body>
     <div id="loginScreen">
@@ -232,6 +322,7 @@
             <button class="btn-action" style="background: #0284c7; color: white;" onclick="openCompanies()">🏢 Firmalar</button>
             <button class="btn-action btn-settings" onclick="openSettings()">⚙️ Ayarlar</button>
             <button class="btn-action btn-excel" onclick="exportToExcel()">📗 Excel</button>
+            <button class="btn-action" style="background: #eab308; color: #1e293b;" onclick="openLiveMap()">🗺️ Canlı Harita</button>
             <button class="btn-action btn-report" onclick="openReportDashboard()">📊 Rapor</button>
             <button class="btn-action btn-save" onclick="saveData()">💾 Kaydet</button>
             <button class="btn-action btn-del" onclick="logout()">🚪 Çıkış</button>
@@ -248,8 +339,8 @@
         </div>
 
         <div class="list-container-inner">
-            <div class="list-header">
-                <div>Müşteri</div> <div>Fatura No</div> <div>Nakliyeci</div> <div>Mod</div> <div>Sevk. Trh.</div> <div>EDT</div> <div>ETA</div> <div>Durum</div> <div class="text-right">Adet</div> <div class="text-right">Palet</div> <div class="text-right">Net KG</div> <div class="text-right">Brüt KG</div> <div class="text-right">Navlun</div> <div class="text-right">Puan</div>
+           <div class="list-header">
+                <div>Müşteri</div> <div>Fatura No</div> <div>Nakliyeci</div> <div>Mod</div> <div>Sevk. Trh.</div> <div>EDT</div> <div>ETA</div> <div>Durum</div> <div>Konum</div> <div class="text-right">Adet</div> <div class="text-right">Palet</div> <div class="text-right">Net KG</div> <div class="text-right">Brüt KG</div> <div class="text-right">Navlun</div> <div class="text-right">Puan</div>
             </div>
             <div id="cardContainer"></div>
         </div>
@@ -366,6 +457,7 @@
                 <div class="row-cell sum-edt">-</div>
                 <div class="row-cell sum-eta">-</div>
                 <div class="row-cell sum-status"></div>
+                <div class="row-cell sum-location" style="color:var(--primary); font-weight:700;">-</div>
                 <div class="row-cell sum-pcs text-right">-</div>
                 <div class="row-cell sum-pallet text-right">-</div>
                 <div class="row-cell sum-net text-right">-</div>
@@ -400,7 +492,12 @@
 
                 <div class="col-section">
                     <div class="section-title">🚚 Lojistik & Kargo</div>
-                    <input list="forwarderList" class="inp-forwarder" placeholder="Nakliyeci..." oninput="this.value = this.value.toUpperCase()">
+                <input list="forwarderList" class="inp-forwarder" placeholder="Nakliyeci..." oninput="this.value = this.value.toUpperCase()">
+                
+                <div class="inp-wrapper" style="margin-top:5px; margin-bottom:5px;">
+                    <input type="text" class="inp-location" placeholder="📍 Güncel Konum (Örn: Kapıkule, Edirne)" oninput="this.value = this.value.toUpperCase()">
+                    <span class="suffix">Konum</span>
+                </div>
                     
                     <div class="grid-2">
                         <select class="mode-select" onchange="handleModeChange(this); calculateAutoScore(this)">
@@ -694,6 +791,7 @@
                 mail: w.querySelector('.inp-mail').value,
                 invoice: w.querySelector('.inp-invoice').value, dateInvoice: w.querySelector('.date-invoice').value, incoterm: w.querySelector('.inp-incoterm').value,
                 forwarder: w.querySelector('.inp-forwarder').value, mode: w.querySelector('.mode-select').value, roadSub: roadOpt ? roadOpt.innerText : null,
+                location: w.querySelector('.inp-location').value,
                 vessel: w.querySelector('.inp-vessel').value, plate: w.querySelector('.inp-plate').value, 
                 booking: w.querySelector('.inp-booking').value, container: w.querySelector('.inp-container').value,
                 freight: w.querySelector('.inp-freight').value, freightCurr: w.querySelector('.inp-freight-curr').value,
@@ -719,6 +817,7 @@
             w.querySelector('.inp-invoice').value = d.invoice || ""; if(d.dateInvoice) w.querySelector('.date-invoice').value = d.dateInvoice;
             w.querySelector('.inp-incoterm').value = d.incoterm || "FCA"; handleIncoterm(w.querySelector('.inp-incoterm'));
             w.querySelector('.inp-forwarder').value = d.forwarder || ""; w.querySelector('.mode-select').value = d.mode || "Tır"; handleModeChange(w.querySelector('.mode-select'));
+            if(d.location) w.querySelector('.inp-location').value = d.location;
             if(d.roadSub) { w.querySelectorAll('.sub-opt').forEach(o => { if(o.innerText.includes(d.roadSub.trim())) o.classList.add('selected'); }); }
             w.querySelector('.inp-vessel').value = d.vessel || ""; if(d.plate) w.querySelector('.inp-plate').value = d.plate;
             
@@ -772,7 +871,8 @@
             w.querySelector('.sum-company').innerText = w.querySelector('.inp-company').value || "Belirsiz";
             let statusCell = w.querySelector('.sum-status');
             if (statusCell) statusCell.innerText = icons;
-            
+            let userLoc = w.querySelector('.inp-location').value;
+            w.querySelector('.sum-location').innerText = userLoc ? userLoc : "📍 KÖRFEZ, KOCAELİ";
             w.querySelector('.sum-invoice').innerText = w.querySelector('.inp-invoice').value || "-";
             w.querySelector('.sum-forwarder').innerText = w.querySelector('.inp-forwarder').value || "-";
             w.querySelector('.sum-mode').innerText = w.querySelector('.mode-select').value;
@@ -1381,7 +1481,20 @@
         window.onload = () => {
             loadSavedDatalists(); // Özel eklenen firmaları hafızadan çeker
         };
-
     </script>
-    </div> </body>
+
+    <div id="liveMapModal" class="modal-overlay">
+        <div class="settings-content" style="max-width: 900px; width: 95%; height: 80vh; display: flex; flex-direction: column;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <h3 style="margin:0; color:#1e293b;">🗺️ Aktif Sevkiyatlar / Canlı Konum Haritası</h3>
+                <button class="btn-action btn-del" onclick="closeModal('liveMapModal')">Kapat</button>
+            </div>
+            <div id="leafletMap" style="flex:1; border-radius: 8px; border: 1px solid #cbd5e1; background: #e2e8f0; position: relative;">
+                <div id="mapLoadingInfo" style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 1000; background: rgba(15,23,42,0.8); color: white; padding: 6px 16px; border-radius: 20px; font-size: 11px; font-weight:bold; display: none;">📍 Konumlar analiz ediliyor...</div>
+            </div>
+        </div>
+    </div>
+
+    </div> 
+</body>
 </html>
