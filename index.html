@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>The Coordinator V46 - System Restored</title>
+    <title>The Coordinator- CPA-FTC Pro </title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
@@ -75,7 +75,9 @@
         .container { max-width: 100%; margin: 0 auto; overflow-x: auto; }
         
         .list-container-inner { min-width: 1250px; }
-        .list-header { display: grid; grid-template-columns: 1.5fr 1.3fr 1.5fr 0.6fr 0.8fr 0.7fr 0.7fr 0.6fr 0.6fr 0.7fr 0.7fr 1.1fr 0.6fr; gap: 10px; padding: 10px 15px; background: #e2e8f0; border-radius: 8px; font-weight: 700; color: #475569; text-transform: uppercase; font-size: 10px; margin-bottom: 10px; }
+        .list-header { display: grid; grid-template-columns: 1.5fr 1.3fr 1.5fr 0.6fr 0.8fr 0.7fr 0.7fr 0.5fr 0.6fr 0.6fr 0.7fr 0.7fr 1.1fr 0.6fr; gap: 10px; padding: 10px 15px; background: #e2e8f0; border-radius: 8px; font-weight: 700; color: #475569; text-transform: uppercase; font-size: 10px; margin-bottom: 10px; }
+        
+        .shipment-row { display: grid; grid-template-columns: 1.5fr 1.3fr 1.5fr 0.6fr 0.8fr 0.7fr 0.7fr 0.5fr 0.6fr 0.6fr 0.7fr 0.7fr 1.1fr 0.6fr; gap: 10px; background: white; padding: 12px 15px; border-radius: 8px; cursor: pointer; border: 1px solid #cbd5e1; align-items: center; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         
         .shipment-wrapper { margin-bottom: 8px; transition: all 0.3s ease;}
         .shipment-row { display: grid; grid-template-columns: 1.5fr 1.3fr 1.5fr 0.6fr 0.8fr 0.7fr 0.7fr 0.6fr 0.6fr 0.7fr 0.7fr 1.1fr 0.6fr; gap: 10px; background: white; padding: 12px 15px; border-radius: 8px; cursor: pointer; border: 1px solid #cbd5e1; align-items: center; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
@@ -173,11 +175,14 @@
         .v-bar-fill { height:100%; background:var(--primary); color:white; font-size:10px; display:flex; align-items:center; padding-left:5px; font-weight:bold; white-space:nowrap; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
         .v-value { width:65px; text-align:right; font-weight:700; color:#64748b; }
         @media print { 
-            body { visibility: hidden; background: white; } 
-            #reportModal { visibility: visible; position: absolute; left: 0; top: 0; width: 100%; background: white; z-index: 9999; } 
-            #reportModal * { visibility: visible; } 
-            .report-content { margin: 0; width: 100%; max-width: 100%; box-shadow: none; border: none; padding: 0; } 
-            .btn-action { display: none !important; } 
+            body { background: white; margin: 0; padding: 0; }
+            body * { visibility: hidden; } 
+            #reportModal, #reportModal * { visibility: visible; } 
+            #reportModal { position: absolute; left: 0; top: 0; width: 100%; height: auto !important; overflow: visible !important; background: white; z-index: 9999; display: block; } 
+            .report-content { margin: 0; padding: 0; width: 100%; max-width: none; box-shadow: none; border: none; overflow: visible !important; height: auto !important; transform: none !important; } 
+            .btn-action, #toast-container { display: none !important; } 
+            .modal-overlay { background: transparent; backdrop-filter: none; position: absolute; }
+            .analysis-section { page-break-inside: avoid; margin-bottom: 20px; }
         }
     </style>
 </head>
@@ -237,7 +242,7 @@
 
         <div class="list-container-inner">
             <div class="list-header">
-                <div>Müşteri</div> <div>Fatura No</div> <div>Nakliyeci</div> <div>Mod</div> <div>Sevk. Trh.</div> <div>EDT</div> <div>ETA</div> <div class="text-right">Adet</div> <div class="text-right">Palet</div> <div class="text-right">Net KG</div> <div class="text-right">Brüt KG</div> <div class="text-right">Navlun</div> <div class="text-right">Puan</div>
+                <div>Müşteri</div> <div>Fatura No</div> <div>Nakliyeci</div> <div>Mod</div> <div>Sevk. Trh.</div> <div>EDT</div> <div>ETA</div> <div>Durum</div> <div class="text-right">Adet</div> <div class="text-right">Palet</div> <div class="text-right">Net KG</div> <div class="text-right">Brüt KG</div> <div class="text-right">Navlun</div> <div class="text-right">Puan</div>
             </div>
             <div id="cardContainer"></div>
         </div>
@@ -353,6 +358,9 @@
                 <div class="row-cell sum-load">-</div>
                 <div class="row-cell sum-edt">-</div>
                 <div class="row-cell sum-eta">-</div>
+                <div class="row-cell sum-eta">-</div>
+                <div class="row-cell sum-status"></div>
+                <div class="row-cell sum-pcs text-right">-</div>
                 <div class="row-cell sum-pcs text-right">-</div>
                 <div class="row-cell sum-pallet text-right">-</div>
                 <div class="row-cell sum-net text-right">-</div>
@@ -752,11 +760,13 @@
                 if(t.innerText === "Sigorta Yapıldı") hasInsurance = true;
             });
 
-            // Emojileri müşteri adının başına ekleme
-            let icons = "";
+            et icons = "";
             if(hasMail) icons += "📧 ";
             if(hasInsurance) icons += "🛡️ ";
-            w.querySelector('.sum-company').innerText = icons + (w.querySelector('.inp-company').value || "Belirsiz");
+            
+            w.querySelector('.sum-company').innerText = w.querySelector('.inp-company').value || "Belirsiz";
+            let statusCell = w.querySelector('.sum-status');
+            if (statusCell) statusCell.innerText = icons;
             
             w.querySelector('.sum-invoice').innerText = w.querySelector('.inp-invoice').value || "-";
             w.querySelector('.sum-forwarder').innerText = w.querySelector('.inp-forwarder').value || "-";
