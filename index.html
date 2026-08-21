@@ -169,6 +169,8 @@
         .btn-settings { background: #e2e8f0; color: #475569; } .btn-settings:hover { background: #cbd5e1; }
         .btn-backup { background: #7c3aed; } .btn-backup:hover { background: #6d28d9; }
         .btn-restore { background: #db2777; } .btn-restore:hover { background: #be185d; }
+        .btn-excel { background: #10b981; color: white; } .btn-excel:hover { background: #059669; }
+        .btn-report { background: #6366f1; color: white; } .btn-report:hover { background: #4f46e5; }
 
         .btn-add-main { background: var(--primary); color: white; border: none; padding: 14px; border-radius: 8px; font-weight: 700; cursor: pointer; width: 100%; margin-bottom: 15px; font-size: 13px; box-shadow: var(--shadow-card); transition: all 0.2s; }
         .btn-add-main:hover { background: var(--primary-dark); }
@@ -1346,6 +1348,7 @@
             
             nameInp.value = ""; countryInp.value = ""; cityInp.value = "";
             refreshCompanyDatalist(); loadCompaniesToManager(); showToast("Firma eklendi.");
+            saveData(true); // Firebase'e senkronize eder
         }
 
         function editCompany(oldName) {
@@ -1369,6 +1372,7 @@
             
             localStorage.setItem('coord_company_data', JSON.stringify(companyData));
             refreshCompanyDatalist(); loadCompaniesToManager(); showToast("Firma güncellendi.");
+            saveData(true); // Firebase'e senkronize eder
         }
 
         function removeCompany(name) {
@@ -1377,6 +1381,7 @@
             delete companyData[name];
             localStorage.setItem('coord_company_data', JSON.stringify(companyData));
             refreshCompanyDatalist(); loadCompaniesToManager(); showToast("Firma silindi.");
+            saveData(true); // Firebase'e senkronize eder
         }
 
         function refreshCompanyDatalist() {
